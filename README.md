@@ -61,10 +61,10 @@ defpkg-finis
 - `:ensure` try to fetch this plugin if not found, or print an error if it is missed.
   - default value: `true`
 - `:fetcher` specifies which program is used for fetching the package, here we use `git`
-  - available options: `
-    - git`: clone a repository to ``USEPKG_DATA`, you can use `:branch` to specify a branch
-    -`curl`: download a single script file with given URL
-    -`nope`: simply find a file in given local path
+  - available options:
+    - `git`: clone a repository to `USEPKG_DATA`, you can use `:branch` to specify a branch
+    - `curl`: download a single script file with given URL
+    - `nope`: simply find a file in given local path
   - default value: `git`
 - `:from` specifies an upstream domain name, or server address. (or local path, only for `nope`)
   - default value: `https://github.com`
@@ -101,7 +101,7 @@ defpkg :name fzf-keybindings :source key-bindings.zsh
 #defpkg :name fzf :source key-bindings,zsh
 
 # fetch from github
-defpkg-satus :fetcher git :from https://github.com
+defpkg-satus :ensure true :fetcher git :from https://github.com
 defpkg :path gynamics/zsh-config
 defpkg :path gynamics/zsh-dirstack
 defpkg :path gynamics/zsh-gitneko
@@ -150,3 +150,10 @@ Hint: If you want to update a curl downloaded script, you can simply run
 usepkg remove PACKAGE_NAME && usepkg reload PACKAGE_NAME
 
 ```
+
+## Debugging
+
+- set `USEPKG_SILENT` to `false` to display `usepkg-message` prints.
+- set `USEPKG_DEBUG` to `true` to display `usepkg-debug` prints.
+
+Currently there are no much debug prints, and it does not panic at somewhere it should.
