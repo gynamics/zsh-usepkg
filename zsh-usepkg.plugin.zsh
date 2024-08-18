@@ -205,9 +205,10 @@ function usepkg-update-1() {
     done
 
     if [[ ${pkg[:fetcher]} != git ]]; then
-        usepkg-error "$key is not a git repository"
+        usepkg-error "${pkg[:name]} is not a git repository"
         return -22 # -EINVAL
     else
+        usepkg-message "Updating ${pkg[:name]} ..."
         git -C ${USEPKG_DATA%/}/${pkg[:name]} pull --rebase
         if [[ $? != 0 ]]; then
             local ret=$?
@@ -229,9 +230,10 @@ function usepkg-remove-1() {
     done
 
     if [[ ${pkg[:fetcher]} != nope ]]; then
+        usepkg-message "Removing ${pkg[:name]} ..."
         rm -rf ${USEPKG_DATA%/}/${pkg[:name]}
     else
-        usepkg-error "$key is a local package\n" \
+        usepkg-error "${pkg[:name]} is a local package\n" \
                      "local packages won't be removed, " \
                      "please remove it manually."
         return -1 # -EPERM
