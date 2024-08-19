@@ -101,6 +101,26 @@ function defpkg() {
 
 typeset -gA package_status
 
+function usepkg-status() {
+    case $1 in
+        FETCH_FAILURE)
+            echo -ne "\e[31m[$1]\e[0m"
+            ;;
+        OK)
+            echo -ne "\e[32m[$1]\e[0m"
+            ;;
+        NOT_FOUND)
+            echo -ne "\e[33m[$1]\e[0m"
+            ;;
+        REMOVED)
+            echo -ne "\e[34m[$1]\e[0m"
+            ;;
+        *)
+            echo -ne "\e[35m[$1]\e[0m"
+            ;;
+    esac
+}
+
 # check, fetch and load given package
 function defpkg-finis-1() {
     if [[ -z ${packages[$1]} ]]; then
@@ -121,7 +141,7 @@ function defpkg-finis-1() {
 
     if [[ ${pkg[:fetcher]} == nope ]]; then
         if [[ ! -e ${pkg[:from]%/}/${pkg[:path]%/}/${pkg[:source]} ]]; then
-            package_status[$1]="\e[33m[NOT_FOUND]\e[0m"
+            package_status[$1]=NOT_FOUND
             if ${pkg[:ensure]}; then
                 usepkg-error "Failed to find ${pkg[:name]} at " \
                          "${pkg[:from]%/}/${pkg[:path]%/}/${pkg[:source]}!"
@@ -134,7 +154,7 @@ function defpkg-finis-1() {
         fi
     else
         if [[ ! -d ${USEPKG_DATA}/${pkg[:name]} ]]; then
-            package_status[$1]="\e[33m[NOT_FOUND]\e[0m"
+            package_status[$1]=NOT_FOUND
             if ${pkg[:ensure]}; then
                 # fetch package (single thread)
                 usepkg-message "Start fetching package ${pkg[:name]} ..."
@@ -166,7 +186,7 @@ function defpkg-finis-1() {
 
                 if [[ $? != 0 ]]; then
                     local ret=$?
-                    package_status[$1]="\e[31m[FETCH_FAILURE]\e[0m"
+                    package_status[$1]=FETCH_FAILURE
                     usepkg-error "Failed to fetch package ${pkg[:name]}"
                     return $ret
                 fi
@@ -179,7 +199,7 @@ function defpkg-finis-1() {
     fi
 
     if [[ $? == 0 ]]; then
-        package_status[$1]="\e[32m[OK]\e[0m"
+        package_status[$1]=OK
     fi
 }
 
@@ -188,6 +208,9 @@ function defpkg-finis() {
 
     local key
     for key in ${(k)packages}; do
+        if [[ ${package_status[$key]} == OK ]]; then
+            continue # do not load a package twice
+        fi
         defpkg-finis-1 "$key"
 
         if [[ $? != 0 ]]; then
@@ -314,7 +337,7 @@ function usepkg() {
             done
             local value
             for key value in ${(kv)package_status}; do
-                printf "%-*s : %b\n" $max_len $key $value
+                printf "%-*s : %b\n" $max_len $key $(usepkg-status $value)
             done
             ;;
         clean)
