@@ -112,6 +112,8 @@ function defpkg-finis-1() {
 
     # extract one pkg
     typeset -A pkg
+    local key
+    local value
     for key value in ${(s/ /)packages[$1]}; do
         usepkg-debug "extract ($key, $value)"
         pkg[$key]="$value"
@@ -119,20 +121,20 @@ function defpkg-finis-1() {
 
     if [[ ${pkg[:fetcher]} == nope ]]; then
         if [[ ! -e ${pkg[:from]%/}/${pkg[:path]%/}/${pkg[:source]} ]]; then
-            package_status[$1]="\e[33mNOT_FOUND\e[0m"
+            package_status[$1]="\e[33m[NOT_FOUND]\e[0m"
             if ${pkg[:ensure]}; then
                 usepkg-error "Failed to find ${pkg[:name]} at " \
                          "${pkg[:from]%/}/${pkg[:path]%/}/${pkg[:source]}!"
                 return -2 # -ENOENT
             else
-                return
+                return 0
             fi
         else
             source ${pkg[:from]%/}/${pkg[:path]%/}/${pkg[:source]}
         fi
     else
         if [[ ! -d ${USEPKG_DATA}/${pkg[:name]} ]]; then
-            package_status[$1]="\e[33mNOT_FOUND\e[0m"
+            package_status[$1]="\e[33m[NOT_FOUND]\e[0m"
             if ${pkg[:ensure]}; then
                 # fetch package (single thread)
                 usepkg-message "Start fetching package ${pkg[:name]} ..."
@@ -169,7 +171,7 @@ function defpkg-finis-1() {
                     return $ret
                 fi
             else # just neglect it
-                return
+                return 0
             fi
         fi
         # load plugin
@@ -184,6 +186,7 @@ function defpkg-finis-1() {
 function defpkg-finis() {
     mkdir -p ${USEPKG_DATA}
 
+    local key
     for key in ${(k)packages}; do
         defpkg-finis-1 "$key"
 
@@ -200,6 +203,8 @@ function usepkg-update-1() {
 
     # extract one pkg
     typeset -A pkg
+    local key
+    local value
     for key value in ${(s/ /)packages[$1]}; do
         pkg[$key]="$value"
     done
@@ -225,13 +230,15 @@ function usepkg-remove-1() {
 
     # extract one pkg
     typeset -A pkg
+    local key
+    local value
     for key value in ${(s/ /)packages[$1]}; do
         pkg[$key]="$value"
     done
 
     if [[ ${pkg[:fetcher]} != nope ]]; then
         usepkg-message "Removing ${pkg[:name]} ..."
-        rm -rf ${USEPKG_DATA%/}/${pkg[:name]}
+        rm -I -rf ${USEPKG_DATA%/}/${pkg[:name]}
     else
         usepkg-error "${pkg[:name]} is a local package\n" \
                      "local packages won't be removed, " \
@@ -244,9 +251,6 @@ function usepkg() {
     local cmd="$1"
 
     case $cmd in
-        dashboard)
-
-        ;;
         help)
             echo "Usage: usepkg [command] [args..]"
             echo "Manage installed plugins."
@@ -281,22 +285,26 @@ function usepkg() {
             fi
         ;;
         update)
+            local key
             for key in ${@:2}; do
                 usepkg-update-1 $key
             done
         ;;
         reload)
+            local key
             for key in ${@:2}; do
                 defpkg-finis-1 $key
             done
         ;;
         remove)
+            local key
             for key in ${@:2}; do
                 usepkg-remove-1 $key
             done
             ;;
         status)
             local max_len=0
+            local key
             # calculate width of the first column
             for key in ${(k)package_status}; do
                 local key_len=${#key}
@@ -304,19 +312,25 @@ function usepkg() {
                     max_len=$key_len
                 fi
             done
+            local value
             for key value in ${(kv)package_status}; do
                 printf "%-*s : %b\n" $max_len $key $value
             done
             ;;
         clean)
+            local dir
             for dir in $(ls -A ${USEPKG_DATA}); do
+                usepkg-message "Removing $dir ..."
                 if [[ -z ${packages[(R)$dir]} ]]; then
-                    rm -rf $dir
+                    rm -I -rf $dir
                 fi
             done
         ;;
         *)
-            usepkg-error "Unknown command: $cmd"
+            if [[ -n $cmd ]]; then
+              echo "Unknown command: $cmd"
+            fi
+            echo -e "Run \e[1musepkg help\e[0m for help."
             return -22 # -EINVAL
         ;;
     esac
