@@ -14,7 +14,7 @@ Dependencies:
 
 ## Installation
 
-You can also simply download `zsh-usepkg.plugin.zsh`from github and source it.
+You can also simply download `zsh-usepkg.plugin.zsh`from github and source it. However, once it starts fetch plugins, all plugins fetched will be saved in directory path `$USEPKG_DATA`(default value is `$HOME/.local/share/zsh`). You can overwrite this variable before running `defpkg-finis`.
 
 ``` shell
 # Bootstrap, run it once
@@ -50,6 +50,7 @@ defpkg \
     :fetcher "git" \
     :from "https://github.com" \
     :path "gynamics/zsh-config" \
+    :branch "master" \
     :source "zsh-config.plugin.zsh"
     
 # do not forget to add this at the end of your declarations
@@ -74,7 +75,9 @@ defpkg-finis
   - default value: `<NAME>.plugin.zsh`, where `<NAME>` is specified by `:name`
   - currently you can not specify multiple files to source at once
 
-`defpkg-finis` will proceed all declarations and make calls.
+`defpkg-finis` will proceed all declarations and make calls. Note that `defpkg` only make declarations and these data are stored in hashed order. Consequently, in `defpkg-finis`, package loadings are usually not executed in declared order.
+
+If you really want to have a strict order, run `defpkg-finis-1 PACKAGE_NAME` right after that `defpkg` field, this function always loads a package immediately. On the contrary, `defpkg-finis` won't load a package twice if it has been loaded successfully.
 
 To avoid writing duplicated recipes, use `defpkg-satus` to modify the default values.
 
@@ -93,7 +96,7 @@ defpkg-satus :from /usr/share :path fzf
 defpkg :name fzf-completion  :source completion.zsh
 defpkg :name fzf-keybindings :source key-bindings.zsh 
 
-# an alternative way is to override that package with the same name later:
+# an alternative way is to do eager loading, then override that package
 # however, this approach will make reload operation broken.
 # we may discuss for a better solution later. (e. g. introduce more separators like zplug?)
 #defpkg :name fzf :source completion.zsh
@@ -127,6 +130,10 @@ usepkg help
 # just a one-line list, no more fascinating things
 usepkg list
 
+# open a git/curl directory
+# not work for local packages
+usepkg open PACKAGE_NAME
+
 # run a git pull --rebase on selected package dir
 # you can pass multiple packages once
 usepkg update PACKAGE_NAME
@@ -144,12 +151,15 @@ usepkg remove PACKAGE_NAME
 usepkg clean
 ```
 
-Hint: If you want to update a curl downloaded script, you can simply run 
-
-``` shell
-usepkg remove PACKAGE_NAME && usepkg reload PACKAGE_NAME
-
-```
+Hints:
+- If you want to update a curl downloaded script, you can simply run 
+  ``` shell
+  usepkg remove PACKAGE_NAME && usepkg reload PACKAGE_NAME
+  ```
+- If you want to update/remove/reload all packages at once, simply run
+  ```shell
+  usepkg update $(usepkg list)
+  ```
 
 ## Debugging
 
