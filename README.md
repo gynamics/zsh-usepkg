@@ -4,7 +4,7 @@ A minimal declarative zsh plugin manager.
 
 Supports:
 - fetch & load plugin(s) with declared methods
-- list, reload, update & remove plugin(s) with commands
+- list, check, reload, update & remove plugin(s) with commands
 
 Dependencies:
 - zsh
@@ -52,7 +52,7 @@ defpkg \
     :path "gynamics/zsh-config" \
     :branch "master" \
     :source "zsh-config.plugin.zsh"
-    
+
 # do not forget to add this at the end of your declarations
 defpkg-finis
 ```
@@ -67,56 +67,41 @@ defpkg-finis
     - `curl`: download a single script file with given URL
     - `nope`: simply find a file in given local path
   - default value: `git`
+  - Currently, this package does not support concurrent downloading & loading, because the shell does not provide a native concurrent request feature. I do not want to introduce more outside dependencies.
 - `:from` specifies an upstream domain name, or server address. (or local path, only for `nope`)
   - default value: `https://github.com`
 - `:path` specifies the bottom part of an URL to the package, which will be combined with `:from`
   - this part is necessary and have no default value, if missed, an error will be raised.
 - `:source` specifies which file is the entry of this package on loading.
   - default value: `<NAME>.plugin.zsh`, where `<NAME>` is specified by `:name`
-  - currently you can not specify multiple files to source at once
+  - you can specify multiple files once, e. g. `:source file1 file2 file3`
+- `:after` specifies which packages should be loaded before this package.
+  - you can specify multiple packages once, e. g. `:after pkg1 pkg2 pkg3`
 
-`defpkg-finis` will proceed all declarations and make calls. Note that `defpkg` only make declarations and these data are stored in hashed order. Consequently, in `defpkg-finis`, package loadings are usually not executed in declared order.
+By default, `defpkg-finis` will proceed all declarations and make calls. Note that `defpkg` only make declarations and these data are stored in hashed order. Consequently, in `defpkg-finis`, package loadings are usually not executed in declared order. `:after`can ensure that before a package is loaded, all its dependencies have been loaded.
 
-If you really want to have a strict order, run `defpkg-finis-1 PACKAGE_NAME` right after that `defpkg` field, this function always loads a package immediately. On the contrary, `defpkg-finis` won't load a package twice if it has been loaded successfully.
-
-To avoid writing duplicated recipes, use `defpkg-satus` to modify the default values.
+To avoid writing duplicated recipes, use `defpkg-satus` to modify the default values. However, we can not reset the default values of `:name`, `:path` and `:source`.
 
 ``` shell
 # this will change the default value of :fetcher and :from for all subsequent declarations.
 defpkg-satus :ensure false :fetcher nope :from /usr/share/zsh/plugins
-
-defpkg :path zsh-autosuggestions # you may installed it as a system package
+defpkg :path zsh-autosuggestions     # you may installed it as a system package
 defpkg :path zsh-syntax-highlighting # you may installed it as a system package
 
-# if you need to source multiple files, you need to separate them into different packages
-# this is relatively fair for local and curl, because they are single-file targeted
-# but problematic with git, becuase multiple packages may cause repeated removal & update
-defpkg-satus :from /usr/share :path fzf
-
-defpkg :name fzf-completion  :source completion.zsh
-defpkg :name fzf-keybindings :source key-bindings.zsh 
-
-# an alternative way is to do eager loading, then override that package
-# however, this approach will make reload operation broken.
-# we may discuss for a better solution later. (e. g. introduce more separators like zplug?)
-#defpkg :name fzf :source completion.zsh
-#defpkg-finis-1 fzf
-#defpkg :name fzf :source key-bindings,zsh
+# the `fzf' system package provides some zsh integration scripts
+defpkg :from /usr/share :path fzf \
+    :source completion.zsh key-bindings.zsh
 
 # fetch from github
 defpkg-satus :ensure true :fetcher git :from https://github.com
 defpkg :path gynamics/zsh-config
 defpkg :path gynamics/zsh-dirstack
-defpkg :path gynamics/zsh-gitneko
+defpkg :path gynamics/zsh-gitneko :after zsh-config # load it after zsh-config
 
 # ...
 
 defpkg-finis # do not miss this at the end of declarations
 ```
-
-However, we can not reset the default values of `:name`, `:path` and `:source`.
-
-Not recommended, if you really want to do that, you can make an extension framework for it first, then, why not switch to a more powerful manager like `oh-my-zsh`?
 
 ## Management
 
@@ -134,15 +119,19 @@ usepkg list
 # not work for local packages
 usepkg open PACKAGE_NAME
 
-# run a git pull --rebase on selected package dir
+# check definition of selected packages
+# you can pass multiple packages once
+usepkg check PACKAGE_NAME
+
+# run a git pull --rebase on selected package dirs
 # you can pass multiple packages once
 usepkg update PACKAGE_NAME
 
-# reload specified package
+# reload specified packages
 # you can pass multiple packages once
 usepkg reload PACKAGE_NAME
 
-# remove specified package
+# remove specified packages
 # you can pass multiple packages once
 # packages of local type won't be removed
 usepkg remove PACKAGE_NAME
@@ -152,14 +141,15 @@ usepkg clean
 ```
 
 Hints:
-- If you want to update a curl downloaded script, you can simply run 
+- If you want to update a curl downloaded script, you can simply run
   ``` shell
   usepkg remove PACKAGE_NAME && usepkg reload PACKAGE_NAME
   ```
-- If you want to update/remove/reload all packages at once, simply run
+- If you want to check/update/remove/reload all packages at once, you can simply run
   ```shell
-  usepkg update $(usepkg list)
+  usepkg check $(usepkg list) # replace check with update/remove/reload
   ```
+- If you want to remove some packages permanently, simply delete corresponding `defpkg` blocks and run `usepkg clean`. Do not use `remove`, because `remove` does not remove your declaration.
 
 ## Debugging
 
