@@ -26,26 +26,19 @@ function usepkg-debug() {
     fi
 }
 
-defpkg_keys=( :name :ensure :fetcher :from :path :branch :source )
+defpkg_keys=( :name :ensure :fetcher :from :path :branch :source :after )
 
 typeset -gA pkg_proto
 
 function defpkg-satus() {
-    if (( $# % 2 != 0 )); then
-        usepkg-error "Expecting an even number of arguments (:key value pairs)."
-        return -22 # -EINVAL
-    fi
-
-    local i
-    for (( i = 1; i <= $#; i += 2 )); do
-        local key=${(P)i}   # Get the key (1st, 3rd, 5th argument, etc.)
-        local value=${(P)$((i + 1))} # Get the corresponding value (2nd, 4th, 6th argument, etc.)
-
-        if [[ -n "${defpkg_keys[(R)${key}]}" ]]; then
-            usepkg-debug "set proto: $key <- $value"
-            pkg_proto[$key]="$value"
+    local key
+    local tuple
+    for tuple in "${(s/ :/)*#:}"; do
+        key=":${tuple%% *}"
+        if [[ -n ${defpkg_keys[(R)$key]} ]]; then
+            pkg_proto[$key]="${tuple#* }"
         else
-            usepkg-error "$key is not a valid key"
+            usepkg-error "$key is not a valid key!"
         fi
     done
 }
@@ -54,11 +47,6 @@ typeset -gA packages
 
 # declare one package
 function defpkg() {
-    if (( $# % 2 != 0 )); then
-        usepkg-error "Expecting an even number of arguments (:key value pairs)."
-        return -22 # -EINVAL
-    fi
-
     typeset -A pkg
 
     # initialize pkg with default values
@@ -68,27 +56,24 @@ function defpkg() {
     done
 
     # parse recipe and save key-value pairs into an associate array
-    local i
-    for (( i = 1; i <= $#; i += 2 )); do
-        local key=${(P)i}   # Get the key (1st, 3rd, 5th argument, etc.)
-        local value=${(P)$((i + 1))} # Get the corresponding value (2nd, 4th, 6th argument, etc.)
-
+    local tuple
+    for tuple in "${(s/ :/)*#:}"; do
+        key=":${tuple%% *}"
         if [[ -n ${defpkg_keys[(R)$key]} ]]; then
-            usepkg-debug "declare package: $key <- $value"
-            pkg[$key]="$value"
+            pkg[$key]="${tuple#* }"
         else
-            usepkg-error "No handler registered for $key"
+            usepkg-error "$key is not a valid key!"
         fi
     done
 
     # figure out :name and :source
-    if [[ -n ${pkg[:path]} ]]; then
-        if [[ -z ${pkg[:name]} ]]; then
-            pkg[:name]=${pkg[:path]##*/}
+    if [[ -n "${pkg[:path]}" ]]; then
+        if [[ -z "${pkg[:name]}" ]]; then
+            pkg[:name]="${pkg[:path]##*/}"
         fi
 
-        if [[ -z ${pkg[:source]} ]]; then
-            pkg[:source]=${pkg[:name]}.plugin.zsh
+        if [[ -z "${pkg[:source]}" ]]; then
+            pkg[:source]="${pkg[:name]}.plugin.zsh"
         fi
     else
         usepkg-error "Value under key :path can not be empty."
@@ -115,8 +100,11 @@ function usepkg-status() {
         REMOVED)
             echo -ne "\e[34m[$1]\e[0m"
             ;;
-        *)
+        LOAD_FAILURE)
             echo -ne "\e[35m[$1]\e[0m"
+            ;;
+        *)
+            echo -ne "\e[36m[$1]\e[0m"
             ;;
     esac
 }
@@ -133,25 +121,43 @@ function defpkg-finis-1() {
     # extract one pkg
     typeset -A pkg
     local key
-    local value
-    for key value in ${(s/ /)packages[$1]}; do
-        usepkg-debug "extract ($key, $value)"
-        pkg[$key]="$value"
+    local tuple
+    for tuple in ${(s/ :/)packages[$1]#:}; do
+        key=":${tuple%% *}"
+        if [[ -n ${defpkg_keys[(R)$key]} ]]; then
+            pkg[$key]="${tuple#* }"
+        else
+            usepkg-error "$key is not a valid key!"
+        fi
     done
 
-    if [[ ${pkg[:fetcher]} == nope ]]; then
-        if [[ ! -e ${pkg[:from]%/}/${pkg[:path]%/}/${pkg[:source]} ]]; then
-            package_status[$1]=NOT_FOUND
-            if ${pkg[:ensure]}; then
-                usepkg-error "Failed to find ${pkg[:name]} at " \
-                         "${pkg[:from]%/}/${pkg[:path]%/}/${pkg[:source]}!"
-                return -2 # -ENOENT
-            else
-                return 0
-            fi
-        else
-            source ${pkg[:from]%/}/${pkg[:path]%/}/${pkg[:source]}
+    # dependency check
+    for key in ${(s/ /)pkg[:after]}; do
+        if [[ -z ${package_status[$key]} ]]; then
+            usepkg-debug "Dependency $key not loaded"
+            defpkg-finis-1 ${key}
         fi
+    done
+
+
+    if [[ ${pkg[:fetcher]} == nope ]]; then
+        local f
+        for f in ${(s/ /)pkg[:source]}; do
+            if [[ ! -e ${pkg[:from]%/}/${pkg[:path]%/}/${f} ]]; then
+                package_status[$1]=NOT_FOUND
+                if ${pkg[:ensure]}; then
+                    usepkg-error "Failed to find ${pkg[:name]} at " \
+                                 "${pkg[:from]%/}/${pkg[:path]%/}/${f}!"
+                    return -2 # -ENOENT
+                else
+                    usepkg-debug "${pkg[:from]%/}/${pkg[:name]%/}/${f} not found"
+                    return 0
+                fi
+            else
+                usepkg-debug "Loading file ${pkg[:from]%/}/${pkg[:name]%/}/${f} ..."
+                source ${pkg[:from]%/}/${pkg[:path]%/}/${f}
+            fi
+        done
     else
         if [[ ! -d ${USEPKG_DATA}/${pkg[:name]} ]]; then
             package_status[$1]=NOT_FOUND
@@ -159,6 +165,7 @@ function defpkg-finis-1() {
                 # fetch package (single thread)
                 usepkg-message "Start fetching package ${pkg[:name]} ..."
 
+                local ret=0
                 case ${pkg[:fetcher]} in
                     git)
                         if [[ -n ${pkg[:branch]} ]]; then
@@ -171,12 +178,20 @@ function defpkg-finis-1() {
                                 ${pkg[:from]%/}/${pkg[:path]} \
                                 ${USEPKG_DATA%/}/${pkg[:name]%/}
                         fi
+                        ret=$?
                         ;;
                     curl)
                         mkdir -p ${USEPKG_DATA}/${pkg[:name]}
-                        # here we simply download one file
-                        curl ${pkg[:from]%/}/${pkg[:path]%/}/${pkg[:source]} \
-                             -o ${USEPKG_DATA%/}/${pkg[:name]%/}/${pkg[:source]}
+                        # here we simply download files needed
+                        local f
+                        for f in ${(s/ /)pkg[:source]}; do
+                            curl ${pkg[:from]%/}/${pkg[:path]%/}/${f} \
+                                 -o ${USEPKG_DATA%/}/${pkg[:name]%/}/${f}
+                            ret=$?
+                            if [[ $ret != 0 ]]; then
+                                break
+                            fi
+                        done
                         ;;
                     *)
                         usepkg-error "Unknown fetcher ${pkg[:fetcher]}"
@@ -184,8 +199,7 @@ function defpkg-finis-1() {
                         ;;
                 esac
 
-                if [[ $? != 0 ]]; then
-                    local ret=$?
+                if [[ $ret != 0 ]]; then
                     package_status[$1]=FETCH_FAILURE
                     usepkg-error "Failed to fetch package ${pkg[:name]}"
                     return $ret
@@ -194,13 +208,21 @@ function defpkg-finis-1() {
                 return 0
             fi
         fi
-        # load plugin
-        source ${USEPKG_DATA%/}/${pkg[:name]%/}/${pkg[:source]}
+        # load plugins
+        local f
+        for f in ${(s/ /)pkg[:source]}; do
+            usepkg-debug "Loading file ${USEPKG_DATA%/}/${pkg[:name]%/}/${f} ..."
+            source ${USEPKG_DATA%/}/${pkg[:name]%/}/${f}
+            local ret=$?
+            if [[ $ret != 0 ]]; then
+                package_status[$1]=LOAD_FAILURE
+                usepkg-error "Failed to load ${USEPKG_DATA%/}/${pkg[:name]%/}/${f}"
+                return $ret
+            fi
+        done
     fi
-
-    if [[ $? == 0 ]]; then
-        package_status[$1]=OK
-    fi
+    package_status[$1]=OK
+    return 0
 }
 
 function defpkg-finis() {
@@ -227,9 +249,14 @@ function usepkg-update-1() {
     # extract one pkg
     typeset -A pkg
     local key
-    local value
-    for key value in ${(s/ /)packages[$1]}; do
-        pkg[$key]="$value"
+    local tuple
+    for tuple in ${(s/ :/)packages[$1]#:}; do
+        key=":${tuple%% *}"
+        if [[ -n ${defpkg_keys[(R)$key]} ]]; then
+            pkg[$key]="${tuple#* }"
+        else
+            usepkg-error "$key is not a valid key!"
+        fi
     done
 
     if [[ ${pkg[:fetcher]} != git ]]; then
@@ -254,9 +281,14 @@ function usepkg-remove-1() {
     # extract one pkg
     typeset -A pkg
     local key
-    local value
-    for key value in ${(s/ /)packages[$1]}; do
-        pkg[$key]="$value"
+    local tuple
+    for tuple in ${(s/ :/)packages[$1]#:}; do
+        key=":${tuple%% *}"
+        if [[ -n ${defpkg_keys[(R)$key]} ]]; then
+            pkg[$key]="${tuple#* }"
+        else
+            usepkg-error "$key is not a valid key!"
+        fi
     done
 
     if [[ ${pkg[:fetcher]} != nope ]]; then
@@ -285,6 +317,8 @@ function usepkg() {
             echo "    list installed packages in one line."
             echo "open [package]"
             echo "    open the directory of a package."
+            echo "check [[package]..]"
+            echo "    check information of a package."
             echo "update [[package]..]"
             echo "    update a list of packages."
             echo "    by default it runs git pull --rebase"
@@ -301,7 +335,24 @@ function usepkg() {
         ;;
         list)
             echo ${(k)packages}
-        ;;
+            ;;
+        check)
+            local key
+            for key in ${@:2}; do
+                if [[ -n $key && -n ${packages[$key]} ]]; then
+                    echo "package: $key"
+                    echo "status: ${package_status[$key]}"
+                    echo "definition:"
+                    local tuple=''
+                    for tuple in ${(s/ :/)packages[$key]#:}; do
+                        echo "  :${tuple%% *} ${tuple#* }"
+                    done
+                else
+                    echo "package $key not declared."
+                fi
+                echo ""
+            done
+            ;;
         open)
             if [[ -n $2 ]]; then
                cd ${USEPKG_DATA%/}/$2
