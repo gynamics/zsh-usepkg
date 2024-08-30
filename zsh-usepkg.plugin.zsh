@@ -28,7 +28,7 @@ function usepkg-debug() {
 
 defpkg_keys=( :name :ensure :fetcher :from :path :branch :source :after )
 
-typeset -gA pkg_proto
+typeset -gA USEPKG_PKG_PROTOTYPE
 
 function defpkg-satus() {
     local key
@@ -36,14 +36,14 @@ function defpkg-satus() {
     for tuple in "${(s/ :/)*#:}"; do
         key=":${tuple%% *}"
         if [[ -n ${defpkg_keys[(R)$key]} ]]; then
-            pkg_proto[$key]="${tuple#* }"
+            USEPKG_PKG_PROTOTYPE[$key]="${tuple#* }"
         else
             usepkg-error "$key is not a valid key!"
         fi
     done
 }
 
-typeset -gA packages
+typeset -gA USEPKG_PKG_DICT
 
 # declare one package
 function defpkg() {
@@ -51,8 +51,8 @@ function defpkg() {
 
     # initialize pkg with default values
     local key
-    for key in ${(k)pkg_proto}; do
-        pkg[$key]="${pkg_proto[$key]}"
+    for key in ${(k)USEPKG_PKG_PROTOTYPE}; do
+        pkg[$key]="${USEPKG_PKG_PROTOTYPE[$key]}"
     done
 
     # parse recipe and save key-value pairs into an associate array
@@ -81,7 +81,7 @@ function defpkg() {
 
     # store it as a plist
     usepkg-debug "package declared: ${pkg[:name]}"
-    packages[${pkg[:name]}]=${(kv)pkg}
+    USEPKG_PKG_DICT[${pkg[:name]}]=${(kv)pkg}
 }
 
 typeset -gA package_status
@@ -111,7 +111,7 @@ function usepkg-status() {
 
 # check, fetch and load given package
 function defpkg-finis-1() {
-    if [[ -z ${packages[$1]} ]]; then
+    if [[ -z ${USEPKG_PKG_DICT[$1]} ]]; then
         return -22 # -EINVAL
     fi
 
@@ -122,7 +122,7 @@ function defpkg-finis-1() {
     typeset -A pkg
     local key
     local tuple
-    for tuple in ${(s/ :/)packages[$1]#:}; do
+    for tuple in ${(s/ :/)USEPKG_PKG_DICT[$1]#:}; do
         key=":${tuple%% *}"
         if [[ -n ${defpkg_keys[(R)$key]} ]]; then
             pkg[$key]="${tuple#* }"
@@ -229,7 +229,7 @@ function defpkg-finis() {
     mkdir -p ${USEPKG_DATA}
 
     local key
-    for key in ${(k)packages}; do
+    for key in ${(k)USEPKG_PKG_DICT}; do
         if [[ ${package_status[$key]} == OK ]]; then
             continue # do not load a package twice
         fi
@@ -242,7 +242,7 @@ function defpkg-finis() {
 }
 
 function usepkg-update-1() {
-    if [[ -z ${packages[$1]} ]]; then
+    if [[ -z ${USEPKG_PKG_DICT[$1]} ]]; then
         return -22 # -EINVAL
     fi
 
@@ -250,7 +250,7 @@ function usepkg-update-1() {
     typeset -A pkg
     local key
     local tuple
-    for tuple in ${(s/ :/)packages[$1]#:}; do
+    for tuple in ${(s/ :/)USEPKG_PKG_DICT[$1]#:}; do
         key=":${tuple%% *}"
         if [[ -n ${defpkg_keys[(R)$key]} ]]; then
             pkg[$key]="${tuple#* }"
@@ -274,7 +274,7 @@ function usepkg-update-1() {
 }
 
 function usepkg-remove-1() {
-    if [[ -z ${packages[$1]} ]]; then
+    if [[ -z ${USEPKG_PKG_DICT[$1]} ]]; then
         return -22 # -EINVAL
     fi
 
@@ -282,7 +282,7 @@ function usepkg-remove-1() {
     typeset -A pkg
     local key
     local tuple
-    for tuple in ${(s/ :/)packages[$1]#:}; do
+    for tuple in ${(s/ :/)USEPKG_PKG_DICT[$1]#:}; do
         key=":${tuple%% *}"
         if [[ -n ${defpkg_keys[(R)$key]} ]]; then
             pkg[$key]="${tuple#* }"
@@ -334,17 +334,17 @@ function usepkg() {
             echo ""
         ;;
         list)
-            echo ${(k)packages}
+            echo ${(k)USEPKG_PKG_DICT}
             ;;
         check)
             local key
             for key in ${@:2}; do
-                if [[ -n $key && -n ${packages[$key]} ]]; then
+                if [[ -n $key && -n ${USEPKG_PKG_DICT[$key]} ]]; then
                     echo "package: $key"
                     echo "status: ${package_status[$key]}"
                     echo "definition:"
                     local tuple=''
-                    for tuple in ${(s/ :/)packages[$key]#:}; do
+                    for tuple in ${(s/ :/)USEPKG_PKG_DICT[$key]#:}; do
                         echo "  :${tuple%% *} ${tuple#* }"
                     done
                 else
@@ -395,7 +395,7 @@ function usepkg() {
             local dir
             for dir in $(ls -A ${USEPKG_DATA}); do
                 usepkg-message "Removing $dir ..."
-                if [[ -z ${packages[(R)$dir]} ]]; then
+                if [[ -z ${USEPKG_PKG_DICT[(R)$dir]} ]]; then
                     rm -I -rf $dir
                 fi
             done
