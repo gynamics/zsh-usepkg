@@ -154,16 +154,10 @@ function defpkg-ensure() {
                 local ret=0
                 case ${pkg[:fetcher]} in
                     git)
-                        if [[ -n ${pkg[:branch]} ]]; then
-                            git clone \
-                                ${pkg[:from]%/}/${pkg[:path]} \
-                                -b ${pkg[:branch]} \
-                                ${USEPKG_DATA%/}/${pkg[:name]%/}
-                        else
-                            git clone \
-                                ${pkg[:from]%/}/${pkg[:path]} \
-                                ${USEPKG_DATA%/}/${pkg[:name]%/}
-                        fi
+                        git clone \
+                            ${pkg[:from]%/}/${pkg[:path]} \
+                            ${pkg[:branch]:+-b} ${pkg[:branch]} \
+                            ${USEPKG_DATA%/}/${pkg[:name]%/}
                         ret=$?
                         ;;
                     curl)
