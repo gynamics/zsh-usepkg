@@ -12,12 +12,16 @@ Dependencies:
 - git (optional, if you want to clone git repositories from internet)
 - curl (optional, if you want to fetch a script file by url)
 
+Pros:
+- extremely simple and light, but enough to use.
+- compared to similar packages like `zplug`, it has a much simpler configuration grammar.
+
 ## Installation
 
 You can also simply download `zsh-usepkg.plugin.zsh`from github and source it. However, once it starts fetch plugins, all plugins fetched will be saved in directory path `$USEPKG_DATA`(default value is `$HOME/.local/share/zsh`). You can overwrite this variable before running `defpkg-finis`.
 
 ``` shell
-# Bootstrap, run it once
+# Bootstrap, put it at the top of your configuration
 function zsh-usepkg-bootstrap() {
     # put it at anywhere you like
     USEPKG_DATA=${HOME}/.local/share/zsh
@@ -44,6 +48,9 @@ After installation, you can simply load it in your `.zshrc`.
 
 # ... (bootstrap here)
 
+# uncomment this line if you want to see some messages
+#USEPKG_SILENT=false
+
 # declare a recipe
 defpkg \
     :name "zsh-config"
@@ -67,7 +74,7 @@ defpkg-finis
     - `curl`: download a single script file with given URL
     - `nope`: simply find a file in given local path
   - default value: `git`
-  - Currently, this package does not support concurrent downloading & loading, because the shell does not provide a native concurrent request feature. I do not want to introduce more outside dependencies.
+  - Currently, this package implements concurrent downloading and sequential loading.
 - `:from` specifies an upstream domain name, or server address. (or local path, only for `nope`)
   - default value: `https://github.com`
 - `:path` specifies the bottom part of an URL to the package, which will be combined with `:from`
@@ -77,6 +84,7 @@ defpkg-finis
   - you can specify multiple files once, e. g. `:source file1 file2 file3`
 - `:after` specifies which packages should be loaded before this package.
   - you can specify multiple packages once, e. g. `:after pkg1 pkg2 pkg3`
+- `:depends` just like `:after`, but aborts if one of specified dependency is missing.
 
 By default, `defpkg-finis` will proceed all declarations and make calls. Note that `defpkg` only make declarations and these data are stored in hashed order. Consequently, in `defpkg-finis`, package loadings are usually not executed in declared order. `:after`can ensure that before a package is loaded, all its dependencies have been loaded.
 
@@ -121,14 +129,16 @@ usepkg open PACKAGE_NAME
 
 # check definition of selected packages
 # you can pass multiple packages once
-usepkg check PACKAGE_NAME
+usepkg info PACKAGE_NAME
 
 # run a git pull --rebase on selected package dirs
 # you can pass multiple packages once
+# updating tasks by default in parallel
 usepkg update PACKAGE_NAME
 
-# reload specified packages
+# reload specified packages, if not present, fetch it first
 # you can pass multiple packages once
+# downloading tasks by default in parallel
 usepkg reload PACKAGE_NAME
 
 # remove specified packages
@@ -145,15 +155,15 @@ Hints:
   ``` shell
   usepkg remove PACKAGE_NAME && usepkg reload PACKAGE_NAME
   ```
-- If you want to check/update/remove/reload all packages at once, you can simply run
+- If you want to run info/update/remove/reload on all packages at once, you can simply run
   ```shell
-  usepkg check $(usepkg list) # replace check with update/remove/reload
+  usepkg info $(usepkg list)
   ```
 - If you want to remove some packages permanently, simply delete corresponding `defpkg` blocks and run `usepkg clean`. Do not use `remove`, because `remove` does not remove your declaration.
 
-## Debugging
+## Debugging toggles
 
-- set `USEPKG_SILENT` to `false` to display `usepkg-message` prints.
-- set `USEPKG_DEBUG` to `true` to display `usepkg-debug` prints.
+- set `USEPKG_SILENT` to `false` to display `usepkg-message` prints, default `true`.
+- set `USEPKG_DEBUG` to `true` to display `usepkg-debug` prints, default `false`.
 
 Currently there are no much debug prints, and it does not panic at somewhere it should.
