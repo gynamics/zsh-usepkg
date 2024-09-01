@@ -48,8 +48,8 @@ After installation, you can simply load it in your `.zshrc`.
 
 # ... (bootstrap here)
 
-# uncomment this line if you want to see some messages
-#USEPKG_SILENT=false
+# uncomment this line if you do not want to see any message
+#USEPKG_SILENT=true
 
 # declare a recipe
 defpkg \
@@ -163,7 +163,7 @@ Hints:
 
 ## Debugging toggles
 
-- set `USEPKG_SILENT` to `false` to display `usepkg-message` prints, default `true`.
+- set `USEPKG_SILENT` to `true` to hide `usepkg-message` prints, default `false`.
 - set `USEPKG_DEBUG` to `true` to display `usepkg-debug` prints, default `false`.
 
 Currently there are no much debug prints, and it does not panic at somewhere it should.

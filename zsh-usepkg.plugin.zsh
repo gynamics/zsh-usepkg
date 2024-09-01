@@ -6,7 +6,7 @@
 # debug toggle
 export USEPKG_DEBUG=${USEPKG_DEBUG:=false}
 # message toggle
-export USEPKG_SILENT=${USEPKG_SILENT:=true}
+export USEPKG_SILENT=${USEPKG_SILENT:=false}
 # directory to store git repositories
 export USEPKG_DATA=${USEPKG_DATA:=${HOME}/.local/share/zsh-usepkg}
 
