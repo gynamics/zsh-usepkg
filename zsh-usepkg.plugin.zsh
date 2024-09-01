@@ -317,8 +317,8 @@ function usepkg-update() {
 
     case ${pkg[:fetcher]} in
         git)
-            usepkg-message "${pkg[:name]}.git: "\
-                           $(git -C ${USEPKG_DATA%/}/${pkg[:name]} pull --rebase 2>&1)
+            usepkg-message "${pkg[:name]}.git: " \
+                           "$(git -C ${USEPKG_DATA%/}/${pkg[:name]} pull --rebase 2>&1)"
             if [[ $? != 0 ]]; then
                 local ret=$?
                 usepkg-error "Failed to fetch package ${pkg[:name]}"
