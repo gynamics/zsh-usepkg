@@ -160,6 +160,10 @@ Hints:
   usepkg info $(usepkg list)
   ```
 - If you want to remove some packages permanently, simply delete corresponding `defpkg` blocks and run `usepkg clean`. Do not use `remove`, because `remove` does not remove your declaration.
+- If you do not want to see any usepkg message at startup, but still want to see usepkg messages, simple replace `usepkg-finis` to:
+  ``` shell
+  usepkg-finis >/dev/null
+  ```
 
 ## Debugging toggles
 
