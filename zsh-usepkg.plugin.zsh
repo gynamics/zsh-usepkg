@@ -461,7 +461,6 @@ function usepkg() {
                 wait $pid >/dev/null
             done
             set -m
-            local key
             for key in ${@:2}; do
                 defpkg-load $key
             done
