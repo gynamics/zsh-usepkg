@@ -213,6 +213,13 @@ function defpkg-load() {
 
     usepkg-message "Loading package ${1} ..."
 
+    # check status
+    if [[ ${USEPKG_PKG_STATUS[$1]} != READY &&
+              ${USEPKG_PKG_STATUS[$1]} != OK ]]; then
+        usepkg-error "$1 is not ready to load, abort."
+        return -2 # -ENOENT
+    fi
+
     # load weak deps
     for key in ${(s/ /)pkg[:after]}; do
         usepkg-debug "Found weak dependency $key ..."
