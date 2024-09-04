@@ -47,7 +47,7 @@ typeset -gA USEPKG_PKG_STATUS
 
 function usepkg-status() {
     case $1 in
-        LOAD_FAILURE) # found but failed to load
+        LOAD_FAILURE|FETCH_FAILURE) # failures
             echo -ne "\e[31m[$1]\e[0m"
             ;;
         OK) # loaded successfully
@@ -59,10 +59,10 @@ function usepkg-status() {
         READY) # package has been found
             echo -ne "\e[34m[$1]\e[0m"
             ;;
-        DECL_ONLY) # just declared
+        DECL_ONLY|FETCHING) # intermediate states
             echo -ne "\e[35m[$1]\e[0m"
             ;;
-        *) # otherwise
+        *)
             echo -ne "\e[36m[$1]\e[0m"
             ;;
     esac
@@ -110,13 +110,19 @@ function defpkg() {
     USEPKG_PKG_STATUS[${pkg[:name]}]=DECL_ONLY
 }
 
-# check & fetch given package
-function defpkg-ensure() {
+# check given package
+# return 0 if package ready
+# return -2 if not found
+function defpkg-check() {
     if [[ -z ${USEPKG_PKG_DECL[$1]} ]]; then
         return -22 # -EINVAL
     fi
 
     usepkg-debug "Checking package ${1} ..."
+
+    if [[ ${USEPKG_PKG_STATUS[$1]} == OK ]]; then
+        return 0 # already loaded
+    fi
 
     # extract one pkg
     typeset -A pkg
@@ -131,66 +137,87 @@ function defpkg-ensure() {
         fi
     done
 
+    USEPKG_PKG_STATUS[${pkg[:name]}]=NOT_FOUND
     if [[ ${pkg[:fetcher]} == nope ]]; then
-        if [[ ! -d ${pkg[:from]%/}/${pkg[:path]} ]]; then
-            USEPKG_PKG_STATUS[$1]=NOT_FOUND
-            if ${pkg[:ensure]}; then
-                usepkg-error "Failed to find ${pkg[:from]%/}/${pkg[:path]}!"
-                return -2 # -ENOENT
-            else
-                usepkg-debug "Failed to find ${pkg[:from]%/}/${pkg[:path]}!"
-            fi
+        if [[ -d ${pkg[:from]%/}/${pkg[:path]} ]]; then
+            USEPKG_PKG_STATUS[${pkg[:name]}]=READY
+            return 0
         else
-            USEPKG_PKG_STATUS[$1]=READY
+            usepkg-debug "Failed to find ${pkg[:from]%/}/${pkg[:path]}!"
         fi
-        return 0
     else
-        if [[ ! -d ${USEPKG_DATA}/${pkg[:name]} ]]; then
-            USEPKG_PKG_STATUS[$1]=NOT_FOUND
-            if ${pkg[:ensure]}; then
-                # fetch package (single thread)
-                usepkg-message "Start fetching package ${pkg[:name]} ..."
-
-                local ret=0
-                case ${pkg[:fetcher]} in
-                    git)
-                        git clone \
-                            ${pkg[:from]%/}/${pkg[:path]} \
-                            ${pkg[:branch]:+-b} ${pkg[:branch]} \
-                            ${USEPKG_DATA%/}/${pkg[:name]%/}
-                        ret=$?
-                        ;;
-                    curl)
-                        mkdir -p ${USEPKG_DATA}/${pkg[:name]}
-                        # here we simply download files needed
-                        local f
-                        for f in ${(s/ /)pkg[:source]}; do
-                            curl ${pkg[:from]%/}/${pkg[:path]%/}/${f} \
-                                 -o ${USEPKG_DATA%/}/${pkg[:name]%/}/${f}
-                            ret=$?
-                            if [[ $ret != 0 ]]; then
-                                break
-                            fi
-                        done
-                        ;;
-                    *)
-                        usepkg-error "Unknown fetcher ${pkg[:fetcher]}"
-                        return -22 # -EINVAL
-                        ;;
-                esac
-
-                if [[ $ret != 0 ]]; then
-                    usepkg-error "Failed to fetch package ${pkg[:name]}"
-                    return $ret
-                else
-                    USEPKG_PKG_STATUS[$1]=READY
-                fi
-            fi
+        if [[ -d ${USEPKG_DATA%/}/${pkg[:name]} ]]; then
+            USEPKG_PKG_STATUS[${pkg[:name]}]=READY
+            return 0
         else
-            USEPKG_PKG_STATUS[$1]=READY
+            usepkg-debug "Failed to find package ${USEPKG_DATA%/}/${pkg[:name]}"
+            if ${pkg[:ensure]}; then
+                USEPKG_PKG_STATUS[${pkg[:name]}]=FETCHING
+            fi
         fi
-        return 0
     fi
+    return -2 # -ENOENT
+}
+
+# fetch given package, this function may be called concurrently
+function defpkg-fetch() {
+    if [[ -z ${USEPKG_PKG_DECL[$1]} ]]; then
+        return -22 # -EINVAL
+    fi
+
+    usepkg-debug "Fetching package ${1} ..."
+
+    # extract one pkg
+    typeset -A pkg
+    local key
+    local tuple
+    for tuple in ${(s/ :/)USEPKG_PKG_DECL[$1]#:}; do
+        key=":${tuple%% *}"
+        if [[ -n ${defpkg_keys[(R)$key]} ]]; then
+            pkg[$key]="${tuple#* }"
+        else
+            usepkg-error "$key is not a valid key!"
+        fi
+    done
+
+    if [[ ${pkg[:fetcher]} != nope ]]; then
+        # fetch package (single thread)
+        usepkg-message "Start fetching package ${pkg[:name]} ..."
+
+        local ret=0
+        case ${pkg[:fetcher]} in
+            git)
+                git clone \
+                    ${pkg[:from]%/}/${pkg[:path]} \
+                    ${pkg[:branch]:+-b} ${pkg[:branch]} \
+                    ${USEPKG_DATA%/}/${pkg[:name]%/}
+                ret=$?
+                ;;
+            curl)
+                mkdir -p ${USEPKG_DATA%/}/${pkg[:name]}
+                # here we simply download files needed
+                local f
+                for f in ${(s/ /)pkg[:source]}; do
+                    curl ${pkg[:from]%/}/${pkg[:path]%/}/${f} \
+                         -o ${USEPKG_DATA%/}/${pkg[:name]%/}/${f}
+                    ret=$?
+                    if [[ $ret != 0 ]]; then
+                        break
+                    fi
+                done
+                ;;
+            *)
+                usepkg-error "Unknown fetcher ${pkg[:fetcher]}"
+                return -22 # -EINVAL
+                ;;
+        esac
+
+        if [[ $ret != 0 ]]; then
+            usepkg-error "Failed to fetch package ${pkg[:name]}"
+            return $ret
+        fi
+    fi
+    return 0
 }
 
 function defpkg-load() {
@@ -212,8 +239,6 @@ function defpkg-load() {
     done
 
     usepkg-message "Loading package ${1} ..."
-
-    # check status
     if [[ ${USEPKG_PKG_STATUS[$1]} != READY &&
               ${USEPKG_PKG_STATUS[$1]} != OK ]]; then
         usepkg-error "$1 is not ready to load, abort."
@@ -224,7 +249,7 @@ function defpkg-load() {
     for key in ${(s/ /)pkg[:after]}; do
         usepkg-debug "Found weak dependency $key ..."
         if [[ ${USEPKG_PKG_STATUS[$key]} != OK ]]; then
-            defpkg-load "$key"
+            defpkg-load $key
             if [[ $? != 0 ]]; then
                 usepkg-debug "Dependency $key not found, continue."
             fi
@@ -235,7 +260,7 @@ function defpkg-load() {
     for key in ${(s/ /)pkg[:depends]}; do
         usepkg-debug "Found strong dependency $key ..."
         if [[ ${USEPKG_PKG_STATUS[$key]} != OK ]]; then
-            defpkg-load "$key"
+            defpkg-load $key
             if [[ $? != 0 ]]; then
                 usepkg-error "Dependency $key broken, abort."
                 return -1
@@ -284,23 +309,37 @@ function defpkg-load() {
 function defpkg-finis() {
     mkdir -p ${USEPKG_DATA}
 
-    local pids=()
     local key
-    set +m # hide monitor message
-    # concurrent downloading
+    # we have to do sequential checking
+    # to avoid racing problems
     for key in ${(k)USEPKG_PKG_DECL}; do
-        defpkg-ensure "$key" & pids+=($!)
+        defpkg-check $key
+    done
+    # concurrent downloading
+    local pids=()
+    set +m # hide monitor message
+    for key in ${(k)USEPKG_PKG_DECL}; do
+        if [[ ${USEPKG_PKG_STATUS[$key]} == FETCHING ]]; then
+            defpkg-fetch $key & pids+=($!)
+        fi
     done
     for pid in ${pids[@]}; do
         wait "$pid"
     done
     set -m # recover monitor message
+    # we have to check them twice to avoid concurrent write
+    for key in ${(k)USEPKG_PKG_DECL}; do
+        defpkg-check $key
+        if [[ ${USEPKG_PKG_STATUS[$key]} == FETCHING ]]; then
+            USEPKG_PKG_STATUS[$key]=FETCH_FAILURE
+        fi
+    done
     # sequential loading
     for key in ${(k)USEPKG_PKG_DECL}; do
         if [[ ${USEPKG_PKG_STATUS[$key]} == OK ]]; then
             continue # do not load a package twice
         fi
-        defpkg-load "$key"
+        defpkg-load $key
     done
 }
 
@@ -333,7 +372,7 @@ function usepkg-update() {
             fi
             ;;
         curl)
-            mkdir -p ${USEPKG_DATA}/${pkg[:name]}
+            mkdir -p ${USEPKG_DATA%/}/${pkg[:name]}
             local f
             for f in ${(s/ /)pkg[:source]}; do
                 usepkg-debug "Fetching ${pkg[:from]%/}/${pkg[:path]%/}/${f} ..."
@@ -371,6 +410,7 @@ function usepkg-remove() {
         fi
     done
 
+    USEPKG_PKG_STATUS[${pkg[:name]}]=NOT_FOUND
     if [[ ${pkg[:fetcher]} != nope ]]; then
         usepkg-message "Removing ${pkg[:name]} ..."
         rm -rf ${USEPKG_DATA%/}/${pkg[:name]}
@@ -439,8 +479,8 @@ function usepkg() {
             fi
             ;;
         update)
-            local pids=()
             local key
+            local pids=()
             set +m
             for key in ${@:2}; do
                 usepkg-update $key & pids+=($!)
@@ -451,16 +491,27 @@ function usepkg() {
             set -m
             ;;
         reload)
-            local pids=()
             local key
+            for key in ${@:2}; do
+                defpkg-check $key
+            done
+            local pids=()
             set +m
             for key in ${@:2}; do
-                defpkg-ensure $key & pids+=($!)
+                if [[ ${USEPKG_PKG_STATUS[$key]} == FETCHING ]]; then
+                    defpkg-fetch $key & pids+=($!)
+                fi
             done
             for pid in ${pids[@]}; do
                 wait $pid >/dev/null
             done
             set -m
+            for key in ${@:2}; do
+                defpkg-check $key # check if fetch succeeded
+                if [[ ${USEPKG_PKG_STATUS[$key]} == FETCHING ]]; then
+                    USEPKG_PKG_STATUS[$key]=FETCH_FAILURE
+                fi
+            done
             for key in ${@:2}; do
                 defpkg-load $key
             done
