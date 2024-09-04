@@ -187,7 +187,7 @@ function defpkg-fetch() {
         local ret=0
         case ${pkg[:fetcher]} in
             git)
-                git clone \
+                git clone -q \
                     ${pkg[:from]%/}/${pkg[:path]} \
                     ${pkg[:branch]:+-b} ${pkg[:branch]} \
                     ${USEPKG_DATA%/}/${pkg[:name]%/}
@@ -198,7 +198,7 @@ function defpkg-fetch() {
                 # here we simply download files needed
                 local f
                 for f in ${(s/ /)pkg[:source]}; do
-                    curl ${pkg[:from]%/}/${pkg[:path]%/}/${f} \
+                    curl -s ${pkg[:from]%/}/${pkg[:path]%/}/${f} \
                          -o ${USEPKG_DATA%/}/${pkg[:name]%/}/${f}
                     ret=$?
                     if [[ $ret != 0 ]]; then
