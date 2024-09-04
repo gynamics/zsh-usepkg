@@ -111,6 +111,9 @@ defpkg :path gynamics/zsh-gitneko :after zsh-config # load it after zsh-config
 defpkg-finis # do not miss this at the end of declarations
 ```
 
+- Since usepkg is declarative, that means package declarations are not processed until you run `defpkg-finis`. You can write any pre-loading configurations before it, at any position. If you need to add some post-loading configuration for a set of packages, you may create a package with `:depends` declared for it.
+- `defpkg-finis`can also be called repeatedly, although it is functional to all package declarations before, it does nothing to those packages that already loaded. So you may call it multiple times to control the actual evaluation time.
+
 ## Management
 
 Use command `usepkg` for package management.
