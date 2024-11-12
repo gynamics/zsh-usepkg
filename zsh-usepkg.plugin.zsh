@@ -8,7 +8,19 @@ export USEPKG_DEBUG=${USEPKG_DEBUG:=false}
 # message toggle
 export USEPKG_SILENT=${USEPKG_SILENT:=false}
 # directory to store git repositories
-export USEPKG_DATA=${USEPKG_DATA:=${HOME}/.local/share/zsh-usepkg}
+export USEPKG_DATA=${USEPKG_DATA:=${HOME}/.local/share/zsh}
+mkdir -p "${USEPKG_DATA}"
+# directory to store comp functions
+export USEPKG_FUNC=${USEPKG_FUNC:=${HOME}/.local/share/zsh/site-functions}
+mkdir -p "${USEPKG_FUNC}"
+# load completion
+if [[ ! -f "${USEPKG_FUNC}/_usepkg" ]]; then
+    cp "${USEPKG_DATA%/}/zsh-usepkg/_usepkg" "${USEPKG_FUNC}/"
+fi
+# join it to fpath
+if [[ ! " $fpath[*] " =~ " ${USEPKG_FUNC} " ]]; then
+    fpath=(${USEPKG_FUNC} "${fpath[@]}")
+fi
 
 function usepkg-error() {
     echo -e "\e[31m[USEPKG_ERROR]\e[0m $*" >&2
@@ -26,7 +38,7 @@ function usepkg-debug() {
     fi
 }
 
-defpkg_keys=( :name :ensure :fetcher :from :path :branch :source :depends :after )
+defpkg_keys=( :name :ensure :fetcher :from :path :branch :source :depends :after :comp )
 
 typeset -gA USEPKG_PKG_PROTO
 
@@ -69,6 +81,7 @@ function usepkg-status() {
 }
 
 typeset -gA USEPKG_PKG_DECL
+typeset -g USEPKG_PKG_DESC=()
 
 # declare one package
 function defpkg() {
@@ -107,6 +120,7 @@ function defpkg() {
     # store it as a plist
     usepkg-debug "package declared: ${pkg[:name]}"
     USEPKG_PKG_DECL[${pkg[:name]}]=${(kv)pkg}
+    USEPKG_PKG_DESC+=("${pkg[:name]}:${pkg[:from]%/}/${pkg[:path]}")
     USEPKG_PKG_STATUS[${pkg[:name]}]=DECL_ONLY
 }
 
@@ -300,6 +314,17 @@ function defpkg-load() {
                 usepkg-debug "Failed to find ${ent} !"
                 return 0
             fi
+        fi
+    done
+
+    # load completions
+    local base="${USEPKG_DATA%/}/${pkg[:name]%/}"
+    for ent in ${(s/ /)pkg[:comp]}; do
+        usepkg-debug "Loading completion ${ent} ..."
+        f="${base}/${ent}"
+        f="${f:t}" # get basename
+        if [[ ! -f "${USEPKG_FUNC}/${f}" ]]; then
+            cp "${base}/${ent}" "${USEPKG_FUNC}/"
         fi
     done
     USEPKG_PKG_STATUS[$1]=OK
@@ -559,6 +584,6 @@ function usepkg() {
 # set default value
 defpkg-satus :ensure true :fetcher git :from 'https://github.com'
 # the recipe of this package itself
-defpkg :path gynamics/zsh-usepkg
+defpkg :path gynamics/zsh-usepkg :comp _usepkg
 # no need to load it twice
 USEPKG_PKG_STATUS[zsh-usepkg]=OK

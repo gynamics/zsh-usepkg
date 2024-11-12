@@ -1,0 +1,27 @@
+#compdef usepkg
+
+_USEPKG_SUBCMDS=(
+    "help:show this help."
+    "list:list installed packages in one line."
+    "open:open the directory of a package."
+    "info:check information of a package."
+    "update:update a list of packages, by default it runs git pull --rebase"
+    "reload:reload a list of packages."
+    "remove:remove a list of packages, local packages won't be removed."
+    "status:list package loading status."
+    "clean:remove undeclared packages in ${USEPKG_DATA}."
+)
+
+_usepkg() {
+    if [[ "${words[CURRENT-1]}" == "usepkg" ]]; then
+        _describe -t usepkg_subcmds 'usepkg subcommands' _USEPKG_SUBCMDS
+    else
+        case "${words[2]}" in
+        info|open|reload|remove|update)
+            _describe -t usepkg_pkg_desc 'Declared packages:' USEPKG_PKG_DESC
+            ;;
+        *)
+            ;;
+        esac
+    fi
+}

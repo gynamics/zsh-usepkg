@@ -53,7 +53,7 @@ After installation, you can simply load it in your `.zshrc`.
 
 # declare a recipe
 defpkg \
-    :name "zsh-config"
+    :name "zsh-config" \
     :fetcher "git" \
     :from "https://github.com" \
     :path "gynamics/zsh-config" \
@@ -85,6 +85,9 @@ defpkg-finis
 - `:after` specifies which packages should be loaded before this package.
   - you can specify multiple packages once, e. g. `:after pkg1 pkg2 pkg3`
 - `:depends` just like `:after`, but aborts if one of specified dependency is missing.
+- `:comp` specifies zsh compdef files, these files will be copied to `${USEPKG_FUNC}`.
+  - you can specify multiple files once, e. g. `:comp file1 file2 file3`.
+  - if that package is loaded after `compinit`, the compdefs may not work at the first time.
 
 By default, `defpkg-finis` will proceed all declarations and make calls. Note that `defpkg` only make declarations and these data are stored in hashed order. Consequently, in `defpkg-finis`, package loadings are usually not executed in declared order. `:after`can ensure that before a package is loaded, all its dependencies have been loaded.
 
@@ -104,7 +107,9 @@ defpkg :from /usr/share :path fzf \
 defpkg-satus :ensure true :fetcher git :from https://github.com
 defpkg :path gynamics/zsh-config
 defpkg :path gynamics/zsh-dirstack
-defpkg :path gynamics/zsh-gitneko :after zsh-config # load it after zsh-config
+defpkg :path gynamics/zsh-gitneko :after zsh-config :comp _gitneko
+# load it after zsh-config, since only zsh-config calls compinit,
+# _gitneko will not be scanned at the first time.
 
 # ...
 
