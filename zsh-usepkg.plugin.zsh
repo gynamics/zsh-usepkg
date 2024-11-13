@@ -14,12 +14,13 @@ mkdir -p "${USEPKG_DATA}"
 export USEPKG_FUNC=${USEPKG_FUNC:=${HOME}/.local/share/zsh/site-functions}
 mkdir -p "${USEPKG_FUNC}"
 # load completion
-if [[ ! -f "${USEPKG_FUNC}/_usepkg" ]]; then
-    cp "${USEPKG_DATA%/}/zsh-usepkg/_usepkg" "${USEPKG_FUNC}/"
+if [[ ! -f "${USEPKG_FUNC%/}/_usepkg" ||
+      "${USEPKG_DATA%/}/zsh-usepkg/_usepkg" -nt "${USEPKG_FUNC%/}/_usepkg" ]]; then
+    cp "${USEPKG_DATA%/}/zsh-usepkg/_usepkg" "${USEPKG_FUNC%/}/"
 fi
 # join it to fpath
-if [[ ! " $fpath[*] " =~ " ${USEPKG_FUNC} " ]]; then
-    fpath=(${USEPKG_FUNC} "${fpath[@]}")
+if [[ ! " $fpath[*] " =~ " ${USEPKG_FUNC%/} " ]]; then
+    fpath=(${USEPKG_FUNC%/} "${fpath[@]}")
 fi
 
 function usepkg-error() {
@@ -323,8 +324,9 @@ function defpkg-load() {
         usepkg-debug "Loading completion ${ent} ..."
         f="${base}/${ent}"
         f="${f:t}" # get basename
-        if [[ ! -f "${USEPKG_FUNC}/${f}" ]]; then
-            cp "${base}/${ent}" "${USEPKG_FUNC}/"
+        if [[ ! -f "${USEPKG_FUNC%/}/${f}" ||
+              "${base}/${ent}" -nt "${USEPKG_FUNC%/}/${f}" ]]; then
+            cp "${base}/${ent}" "${USEPKG_FUNC%/}/"
         fi
     done
     USEPKG_PKG_STATUS[$1]=OK
@@ -565,7 +567,8 @@ function usepkg() {
         clean)
             local dir
             for dir in $(ls -A ${USEPKG_DATA}); do
-                if [[ -z ${USEPKG_PKG_DECL[$dir]} ]]; then
+                if [[ ${dir} != "${USEPKG_FUNC:t}" &&
+                      -z ${USEPKG_PKG_DECL[$dir]} ]]; then
                     usepkg-message "Removing $dir ..."
                     rm -rf $dir
                 fi
