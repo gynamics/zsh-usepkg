@@ -8,19 +8,19 @@ export USEPKG_DEBUG=${USEPKG_DEBUG:=false}
 # message toggle
 export USEPKG_SILENT=${USEPKG_SILENT:=false}
 # directory to store git repositories
-export USEPKG_DATA=${USEPKG_DATA:=${HOME}/.local/share/zsh}
-mkdir -p "${USEPKG_DATA}"
+export USEPKG_PLUGIN_PATH=${USEPKG_PLUGIN_PATH:=${HOME}/.local/share/zsh/plugins}
+mkdir -p "${USEPKG_PLUGIN_PATH}"
 # directory to store comp functions
-export USEPKG_FUNC=${USEPKG_FUNC:=${HOME}/.local/share/zsh/site-functions}
-mkdir -p "${USEPKG_FUNC}"
+export USEPKG_FUNC_PATH=${USEPKG_FUNC_PATH:=${HOME}/.local/share/zsh/site-functions}
+mkdir -p "${USEPKG_FUNC_PATH}"
 # load completion
-if [[ ! -f "${USEPKG_FUNC%/}/_usepkg" ||
-      "${USEPKG_DATA%/}/zsh-usepkg/_usepkg" -nt "${USEPKG_FUNC%/}/_usepkg" ]]; then
-    cp "${USEPKG_DATA%/}/zsh-usepkg/_usepkg" "${USEPKG_FUNC%/}/"
+if [[ ! -f "${USEPKG_FUNC_PATH%/}/_usepkg" ||
+      "${USEPKG_PLUGIN_PATH%/}/zsh-usepkg/_usepkg" -nt "${USEPKG_FUNC_PATH%/}/_usepkg" ]]; then
+    cp "${USEPKG_PLUGIN_PATH%/}/zsh-usepkg/_usepkg" "${USEPKG_FUNC_PATH%/}/"
 fi
 # join it to fpath
-if [[ ! " $fpath[*] " =~ " ${USEPKG_FUNC%/} " ]]; then
-    fpath=(${USEPKG_FUNC%/} "${fpath[@]}")
+if [[ ! " $fpath[*] " =~ " ${USEPKG_FUNC_PATH%/} " ]]; then
+    fpath=(${USEPKG_FUNC_PATH%/} "${fpath[@]}")
 fi
 
 function usepkg-error() {
@@ -161,11 +161,11 @@ function defpkg-check() {
             usepkg-debug "Failed to find ${pkg[:from]%/}/${pkg[:path]}!"
         fi
     else
-        if [[ -d ${USEPKG_DATA%/}/${pkg[:name]} ]]; then
+        if [[ -d ${USEPKG_PLUGIN_PATH%/}/${pkg[:name]} ]]; then
             USEPKG_PKG_STATUS[${pkg[:name]}]=READY
             return 0
         else
-            usepkg-debug "Failed to find package ${USEPKG_DATA%/}/${pkg[:name]}"
+            usepkg-debug "Failed to find package ${USEPKG_PLUGIN_PATH%/}/${pkg[:name]}"
             if ${pkg[:ensure]}; then
                 USEPKG_PKG_STATUS[${pkg[:name]}]=FETCHING
             fi
@@ -205,16 +205,16 @@ function defpkg-fetch() {
                 git clone -q \
                     ${pkg[:from]%/}/${pkg[:path]} \
                     ${pkg[:branch]:+-b} ${pkg[:branch]} \
-                    ${USEPKG_DATA%/}/${pkg[:name]%/}
+                    ${USEPKG_PLUGIN_PATH%/}/${pkg[:name]%/}
                 ret=$?
                 ;;
             curl)
-                mkdir -p ${USEPKG_DATA%/}/${pkg[:name]}
+                mkdir -p ${USEPKG_PLUGIN_PATH%/}/${pkg[:name]}
                 # here we simply download files needed
                 local f
                 for f in ${(s/ /)pkg[:source]}; do
                     curl -s ${pkg[:from]%/}/${pkg[:path]%/}/${f} \
-                         -o ${USEPKG_DATA%/}/${pkg[:name]%/}/${f}
+                         -o ${USEPKG_PLUGIN_PATH%/}/${pkg[:name]%/}/${f}
                     ret=$?
                     if [[ $ret != 0 ]]; then
                         break
@@ -293,7 +293,7 @@ function defpkg-load() {
                 ent=${pkg[:from]%/}/${pkg[:path]%/}/${f}
                 ;;
             *)
-                ent=${USEPKG_DATA%/}/${pkg[:name]%/}/${f}
+                ent=${USEPKG_PLUGIN_PATH%/}/${pkg[:name]%/}/${f}
                 ;;
         esac
 
@@ -319,14 +319,14 @@ function defpkg-load() {
     done
 
     # load completions
-    local base="${USEPKG_DATA%/}/${pkg[:name]%/}"
+    local base="${USEPKG_PLUGIN_PATH%/}/${pkg[:name]%/}"
     for ent in ${(s/ /)pkg[:comp]}; do
         usepkg-debug "Loading completion ${ent} ..."
         f="${base}/${ent}"
         f="${f:t}" # get basename
-        if [[ ! -f "${USEPKG_FUNC%/}/${f}" ||
-              "${base}/${ent}" -nt "${USEPKG_FUNC%/}/${f}" ]]; then
-            cp "${base}/${ent}" "${USEPKG_FUNC%/}/"
+        if [[ ! -f "${USEPKG_FUNC_PATH%/}/${f}" ||
+              "${base}/${ent}" -nt "${USEPKG_FUNC_PATH%/}/${f}" ]]; then
+            cp "${base}/${ent}" "${USEPKG_FUNC_PATH%/}/"
         fi
     done
     USEPKG_PKG_STATUS[$1]=OK
@@ -334,7 +334,7 @@ function defpkg-load() {
 }
 
 function defpkg-finis() {
-    mkdir -p ${USEPKG_DATA}
+    mkdir -p ${USEPKG_PLUGIN_PATH}
 
     local key
     # we have to do sequential checking
@@ -391,7 +391,7 @@ function usepkg-update() {
     case ${pkg[:fetcher]} in
         git)
             usepkg-message "${pkg[:name]}.git: " \
-                           "$(git -C ${USEPKG_DATA%/}/${pkg[:name]} pull --rebase 2>&1)"
+                           "$(git -C ${USEPKG_PLUGIN_PATH%/}/${pkg[:name]} pull --rebase 2>&1)"
             if [[ $? != 0 ]]; then
                 local ret=$?
                 usepkg-error "Failed to fetch package ${pkg[:name]}"
@@ -399,12 +399,12 @@ function usepkg-update() {
             fi
             ;;
         curl)
-            mkdir -p ${USEPKG_DATA%/}/${pkg[:name]}
+            mkdir -p ${USEPKG_PLUGIN_PATH%/}/${pkg[:name]}
             local f
             for f in ${(s/ /)pkg[:source]}; do
                 usepkg-debug "Fetching ${pkg[:from]%/}/${pkg[:path]%/}/${f} ..."
                 curl ${pkg[:from]%/}/${pkg[:path]%/}/${f} \
-                     -o ${USEPKG_DATA%/}/${pkg[:name]%/}/${f}
+                     -o ${USEPKG_PLUGIN_PATH%/}/${pkg[:name]%/}/${f}
                 if [[ $ret != 0 ]]; then
                     local ret=$?
                     usepkg-error "Failed to fetch file ${pkg[:name]}/${f}"
@@ -440,7 +440,7 @@ function usepkg-remove() {
     USEPKG_PKG_STATUS[${pkg[:name]}]=NOT_FOUND
     if [[ ${pkg[:fetcher]} != nope ]]; then
         usepkg-message "Removing ${pkg[:name]} ..."
-        rm -rf ${USEPKG_DATA%/}/${pkg[:name]}
+        rm -rf ${USEPKG_PLUGIN_PATH%/}/${pkg[:name]}
     else
         usepkg-error "${pkg[:name]} is a local package\n" \
                      "local packages won't be removed, " \
@@ -477,7 +477,7 @@ function usepkg() {
             echo "status"
             echo "    list package loading status."
             echo "clean [[package]..]"
-            echo "    remove undeclared packages in ${USEPKG_DATA}."
+            echo "    remove undeclared packages in ${USEPKG_PLUGIN_PATH}."
             echo ""
             ;;
         list)
@@ -502,7 +502,7 @@ function usepkg() {
             ;;
         open)
             if [[ -n $2 ]]; then
-                cd ${USEPKG_DATA%/}/$2
+                cd ${USEPKG_PLUGIN_PATH%/}/$2
             fi
             ;;
         update)
@@ -566,8 +566,8 @@ function usepkg() {
             ;;
         clean)
             local dir
-            for dir in $(ls -A ${USEPKG_DATA}); do
-                if [[ ${dir} != "${USEPKG_FUNC:t}" &&
+            for dir in $(ls -A ${USEPKG_PLUGIN_PATH}); do
+                if [[ ${dir} != "${USEPKG_FUNC_PATH:t}" &&
                       -z ${USEPKG_PKG_DECL[$dir]} ]]; then
                     usepkg-message "Removing $dir ..."
                     rm -rf $dir

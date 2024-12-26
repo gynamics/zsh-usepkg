@@ -18,21 +18,21 @@ Pros:
 
 ## Installation
 
-You can also simply download `zsh-usepkg.plugin.zsh`from github and source it. However, once it starts fetch plugins, all plugins fetched will be saved in directory path `$USEPKG_DATA`(default value is `$HOME/.local/share/zsh`). You can overwrite this variable before running `defpkg-finis`.
+You can also simply download `zsh-usepkg.plugin.zsh`from github and source it. However, once it starts fetch plugins, all plugins fetched will be saved in directory path `$USEPKG_PLUGIN_PATH`(default value is `$HOME/.local/share/zsh/plugins`). You can overwrite this variable before running `defpkg-finis`.
 
 ``` shell
 # Bootstrap, put it at the top of your configuration
 function zsh-usepkg-bootstrap() {
     # put it at anywhere you like
-    USEPKG_DATA=${HOME}/.local/share/zsh
+    USEPKG_PLUGIN_PATH=${HOME}/.local/share/zsh/plugins
 
     # check if zsh-usepkg exists
-    if ! [[ -d ${USEPKG_DATA}/zsh-usepkg ]]; then
-        mkdir -p ${USEPKG_DATA} && \
-        git clone https://github.com/gynamics/zsh-usepkg ${USEPKG_DATA}/zsh-usepkg
+    if ! [[ -d ${USEPKG_PLUGIN_PATH}/zsh-usepkg ]]; then
+        mkdir -p ${USEPKG_PLUGIN_PATH} && \
+        git clone https://github.com/gynamics/zsh-usepkg ${USEPKG_PLUGIN_PATH}/zsh-usepkg
     fi
     # load the plugin
-    source ${USEPKG_DATA}/zsh-usepkg/zsh-usepkg.plugin.zsh
+    source ${USEPKG_PLUGIN_PATH}/zsh-usepkg/zsh-usepkg.plugin.zsh
 }
 
 zsh-usepkg-bootstrap
@@ -70,7 +70,7 @@ defpkg-finis
   - default value: `true`
 - `:fetcher` specifies which program is used for fetching the package, here we use `git`
   - available options:
-    - `git`: clone a repository to `USEPKG_DATA`, you can use `:branch` to specify a branch
+    - `git`: clone a repository to `USEPKG_PLUGIN_PATH`, you can use `:branch` to specify a branch
     - `curl`: download a single script file with given URL
     - `nope`: simply find a file in given local path
   - default value: `git`
@@ -85,7 +85,7 @@ defpkg-finis
 - `:after` specifies which packages should be loaded before this package.
   - you can specify multiple packages once, e. g. `:after pkg1 pkg2 pkg3`
 - `:depends` just like `:after`, but aborts if one of specified dependency is missing.
-- `:comp` specifies zsh compdef files, these files will be copied to `${USEPKG_FUNC}`.
+- `:comp` specifies zsh compdef files, these files will be copied to `${USEPKG_FUNC_PATH}`.
   - you can specify multiple files once, e. g. `:comp file1 file2 file3`.
   - if that package is loaded after `compinit`, the compdefs may not work at the first time.
 
@@ -154,7 +154,7 @@ usepkg reload PACKAGE_NAME
 # packages of local type won't be removed
 usepkg remove PACKAGE_NAME
 
-# remove undeclared packages in ${USEPKG_DATA}
+# remove undeclared packages in ${USEPKG_PLUGIN_PATH}
 usepkg clean
 ```
 
