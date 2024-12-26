@@ -39,7 +39,7 @@ function usepkg-debug() {
     fi
 }
 
-defpkg_keys=( :name :ensure :fetcher :from :path :branch :source :depends :after :comp )
+defpkg_keys=( :name :ensure :fetcher :from :path :branch :source :depends :after :comp :preface :config )
 
 typeset -gA USEPKG_PKG_PROTO
 
@@ -260,6 +260,10 @@ function defpkg-load() {
         return -2 # -ENOENT
     fi
 
+    # load preface
+    usepkg-debug "Eval preface \"${pkg[:preface]}\" ..."
+    eval ${pkg[:preface]}
+
     # load weak deps
     for key in ${(s/ /)pkg[:after]}; do
         usepkg-debug "Found weak dependency $key ..."
@@ -329,6 +333,11 @@ function defpkg-load() {
             cp "${base}/${ent}" "${USEPKG_FUNC_PATH%/}/"
         fi
     done
+
+    # load config
+    usepkg-debug "Eval config \"${pkg[:config]}\" ..."
+    eval ${pkg[:config]}
+
     USEPKG_PKG_STATUS[$1]=OK
     return 0
 }

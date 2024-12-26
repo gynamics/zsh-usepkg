@@ -88,6 +88,11 @@ defpkg-finis
 - `:comp` specifies zsh compdef files, these files will be copied to `${USEPKG_FUNC_PATH}`.
   - you can specify multiple files once, e. g. `:comp file1 file2 file3`.
   - if that package is loaded after `compinit`, the compdefs may not work at the first time.
+- `:preface` allows you evaluate given string before the package is loaded.
+- `:config` allows you evaluate given string after the package is loaded.
+  - keep in mind that `defpkg` just makes a declaration, everything happens at `defpkg-finis`, keep some configuration commands together with the declaration will be helpful.
+  - you can nest commands in a string to evaluate multiple commands once, e. g. `:config 'cmd1; cmd2; cmd3'`.
+  - Don't abuse this option, if you really have a lot of commands to run, consider write them in a separate script, and declare it to be loaded `:after` your package.
 
 By default, `defpkg-finis` will proceed all declarations and make calls. Note that `defpkg` only make declarations and these data are stored in hashed order. Consequently, in `defpkg-finis`, package loadings are usually not executed in declared order. `:after`can ensure that before a package is loaded, all its dependencies have been loaded.
 
