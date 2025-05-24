@@ -579,6 +579,9 @@ function usepkg() {
                 fi
             done
             for key in ${@:2}; do
+                if [[ ${USEPKG_PKG_STATUS[$key]} == OK ]]; then
+                    USEPKG_PKG_STATUS[$key]=READY
+                fi
                 defpkg-load $key
             done
             ;;
