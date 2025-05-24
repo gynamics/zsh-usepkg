@@ -39,7 +39,7 @@ function usepkg-debug() {
     fi
 }
 
-defpkg_keys=( :name :ensure :fetcher :from :path :branch :source :depends :after :comp :preface :config )
+defpkg_keys=( :name :ensure :fetcher :from :path :branch :source :depends :after :comp :preface :config :rev )
 
 typeset -gA USEPKG_PKG_PROTO
 
@@ -202,10 +202,17 @@ function defpkg-fetch() {
         local ret=0
         case ${pkg[:fetcher]} in
             git)
-                git clone -q \
-                    ${pkg[:from]%/}/${pkg[:path]} \
-                    ${pkg[:branch]:+-b} ${pkg[:branch]} \
-                    ${USEPKG_PLUGIN_PATH%/}/${pkg[:name]%/}
+                if [[ -n ${pkg[:rev]} ]]; then
+                    git clone -q \
+                        ${pkg[:from]%/}/${pkg[:path]} \
+                        --revision=${pkg[:rev]} \
+                        ${USEPKG_PLUGIN_PATH%/}/${pkg[:name]%/}
+                else
+                    git clone -q \
+                        ${pkg[:from]%/}/${pkg[:path]} \
+                        ${pkg[:branch]:+-b} ${pkg[:branch]} \
+                        ${USEPKG_PLUGIN_PATH%/}/${pkg[:name]%/}
+                fi
                 ret=$?
                 ;;
             curl)
@@ -396,6 +403,7 @@ function defpkg-finis() {
     done
 }
 
+# Usage: usepkg-update [PACKGE-NAME]
 function usepkg-update() {
     if [[ -z ${USEPKG_PKG_DECL[$1]} ]]; then
         return -22 # -EINVAL
@@ -416,12 +424,16 @@ function usepkg-update() {
 
     case ${pkg[:fetcher]} in
         git)
-            usepkg-message "${pkg[:name]}.git: " \
-                           "$(git -C ${USEPKG_PLUGIN_PATH%/}/${pkg[:name]} pull --rebase 2>&1)"
-            if [[ $? != 0 ]]; then
-                local ret=$?
-                usepkg-error "Failed to fetch package ${pkg[:name]}"
-                return $ret
+            if [[ -n ${pkg[:rev]} ]]; then
+                usepkg-message "${pkg[:name]}.git: pinned to ${pkg[:rev]}"
+            else
+                usepkg-message "${pkg[:name]}.git: " \
+                               "$(git -C ${USEPKG_PLUGIN_PATH%/}/${pkg[:name]} pull --rebase 2>&1)"
+                if [[ $? != 0 ]]; then
+                    local ret=$?
+                    usepkg-error "Failed to fetch package ${pkg[:name]}"
+                    return $ret
+                fi
             fi
             ;;
         curl)
@@ -431,7 +443,7 @@ function usepkg-update() {
                 usepkg-debug "Fetching ${pkg[:from]%/}/${pkg[:path]%/}/${f} ..."
                 curl ${pkg[:from]%/}/${pkg[:path]%/}/${f} \
                      -o ${USEPKG_PLUGIN_PATH%/}/${pkg[:name]%/}/${f}
-                if [[ $ret != 0 ]]; then
+                if [[ $? != 0 ]]; then
                     local ret=$?
                     usepkg-error "Failed to fetch file ${pkg[:name]}/${f}"
                     return $ret
@@ -445,6 +457,7 @@ function usepkg-update() {
     esac
 }
 
+# Usage: usepkg-remove [PACKGE-NAME]
 function usepkg-remove() {
     if [[ -z ${USEPKG_PKG_DECL[$1]} ]]; then
         return -22 # -EINVAL

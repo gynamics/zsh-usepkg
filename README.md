@@ -70,7 +70,10 @@ defpkg-finis
   - default value: `true`
 - `:fetcher` specifies which program is used for fetching the package, here we use `git`
   - available options:
-    - `git`: clone a repository to `USEPKG_PLUGIN_PATH`, you can use `:branch` to specify a branch
+    - `git`: clone a repository to `USEPKG_PLUGIN_PATH`
+      - use `:branch` to specify a branch name
+      - use `:rev` to specify that is should be freezed by `--revision=<rev>` option for `git clone`.
+        this option is not compatible with `:branch`, and such packages will be neglected by `usepkg-update`.
     - `curl`: download a single script file with given URL
     - `nope`: simply find a file in given local path
   - default value: `git`
@@ -177,6 +180,8 @@ Hints:
   ``` shell
   usepkg-finis >/dev/null
   ```
+- If you got some packages broken on installing or updating, simple run `usepkg-remove <NAME>` to get rid of broken data.
+  However, if it has left some broken configuration data outside of its directory, we can't track it, ask the package maintainer.
 
 ## Debugging toggles
 
