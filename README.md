@@ -182,6 +182,8 @@ Hints:
   ```
 - If you got some packages broken on installing or updating, simple run `usepkg-remove <NAME>` to get rid of broken data.
   However, if it has left some broken configuration data outside of its directory, we can't track it, ask the package maintainer.
+- The `update` command uses `--rebase` by default so it is not suitable to be used for managing a develop version.
+  If you want to use a local repository on developing, you should use `none` with a local path rather than `git` for fetcher.
 
 ## Debugging toggles
 
