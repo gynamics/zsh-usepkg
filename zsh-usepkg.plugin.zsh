@@ -82,7 +82,7 @@ function usepkg-status() {
 }
 
 typeset -gA USEPKG_PKG_DECL
-typeset -g USEPKG_PKG_DESC=()
+typeset -g USEPKG_PKG_DESC=( $USEPKG_PKG_DESC )
 
 # declare one package
 function defpkg() {
