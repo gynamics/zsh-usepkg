@@ -72,7 +72,7 @@ function usepkg-status() {
         READY) # package has been found
             echo -ne "\e[34m[$1]\e[0m"
             ;;
-        DECL_ONLY|FETCHING) # intermediate states
+        DECL_ONLY|FETCHING|PREPARING|LOADING) # intermediate states
             echo -ne "\e[35m[$1]\e[0m"
             ;;
         *)
@@ -236,6 +236,17 @@ function defpkg-fetch() {
 }
 
 function defpkg-load() {
+    # check if it is ready to load
+    usepkg-message "Loading package ${1} ..."
+    if [[ ${USEPKG_PKG_STATUS[$1]} == OK ]]; then
+        usepkg-message "$1 is already loaded."
+        return 0
+    elif [[ ${USEPKG_PKG_STATUS[$1]} != READY ]]; then
+        usepkg-error "$1 is not ready to load, abort."
+        return -2 # -ENOENT
+    fi
+
+    # parse declaration
     if [[ -z ${USEPKG_PKG_DECL[$1]} ]]; then
         return -22 # -EINVAL
     fi
@@ -253,21 +264,20 @@ function defpkg-load() {
         fi
     done
 
-    usepkg-message "Loading package ${1} ..."
-    if [[ ${USEPKG_PKG_STATUS[$1]} != READY &&
-              ${USEPKG_PKG_STATUS[$1]} != OK ]]; then
-        usepkg-error "$1 is not ready to load, abort."
-        return -2 # -ENOENT
-    fi
-
     # load preface
     usepkg-debug "Eval preface \"${pkg[:preface]}\" ..."
     eval ${pkg[:preface]}
 
+    # pin it when preparing dependencies to avoid cycles
+    USEPKG_PKG_STATUS[$1]=PREPARING
+
     # load weak deps
     for key in ${(s/ /)pkg[:after]}; do
         usepkg-debug "Found weak dependency $key ..."
-        if [[ ${USEPKG_PKG_STATUS[$key]} != OK ]]; then
+        if [[ ${USEPKG_PKG_STATUS[$key]} == PREPARING ]]; then
+            usepkg-debug "Dependency cycle detected:"
+            usepkg-debug "$key -> ... -> ${pkg[:name]} -> ... -> $key"
+        elif [[ ${USEPKG_PKG_STATUS[$key]} != OK ]]; then
             defpkg-load $key
             if [[ $? != 0 ]]; then
                 usepkg-debug "Dependency $key not found, continue."
@@ -278,7 +288,10 @@ function defpkg-load() {
     # load strong deps
     for key in ${(s/ /)pkg[:depends]}; do
         usepkg-debug "Found strong dependency $key ..."
-        if [[ ${USEPKG_PKG_STATUS[$key]} != OK ]]; then
+        if [[ ${USEPKG_PKG_STATUS[$key]} == PREPARING ]]; then
+            usepkg-message "Dependency cycle detected:"
+            usepkg-message "$key -> ... -> ${pkg[:name]} -> ... -> $key"
+        elif [[ ${USEPKG_PKG_STATUS[$key]} != OK ]]; then
             defpkg-load $key
             if [[ $? != 0 ]]; then
                 usepkg-error "Dependency $key broken, abort."
@@ -287,7 +300,11 @@ function defpkg-load() {
         fi
     done
 
-    # load plugins
+    # zsh does not do concurrent loading,
+    # however, it is possible to polling on LOADING state in the future.
+    USEPKG_PKG_STATUS[$1]=LOADING
+
+    # load script file
     local f
     local ent
     local ret
