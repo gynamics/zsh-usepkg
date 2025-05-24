@@ -246,8 +246,7 @@ function defpkg-load() {
     # check if it is ready to load
     usepkg-message "Loading package ${1} ..."
     if [[ ${USEPKG_PKG_STATUS[$1]} == OK ]]; then
-        usepkg-message "$1 is already loaded."
-        return 0
+        usepkg-message "$1 is already loaded, reloading..."
     elif [[ ${USEPKG_PKG_STATUS[$1]} != READY ]]; then
         usepkg-error "$1 is not ready to load, abort."
         return -2 # -ENOENT
