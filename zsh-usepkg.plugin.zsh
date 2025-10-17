@@ -82,7 +82,7 @@ function usepkg-status() {
 }
 
 typeset -gA USEPKG_PKG_DECL
-typeset -g USEPKG_PKG_DESC=( $USEPKG_PKG_DESC )
+typeset -g USEPKG_PKG_DESC=( ${(R)USEPKG_PKG_DESC:#zsh-usepkg:*} )
 
 # declare one package
 function defpkg() {
@@ -121,7 +121,7 @@ function defpkg() {
     # store it as a plist
     usepkg-debug "package declared: ${pkg[:name]}"
     USEPKG_PKG_DECL[${pkg[:name]}]=${(kv)pkg}
-    USEPKG_PKG_DESC+=("${pkg[:name]}:${pkg[:from]%/}/${pkg[:path]}")
+    USEPKG_PKG_DESC=( "${pkg[:name]}:${pkg[:from]%/}/${pkg[:path]}" ${(R)USEPKG_PKG_DESC:#$pkg[:name]:*} )
     USEPKG_PKG_STATUS[${pkg[:name]}]=DECL_ONLY
 }
 
@@ -540,8 +540,22 @@ function usepkg() {
             done
             ;;
         open)
-            if [[ -n $2 ]]; then
-                cd ${USEPKG_PLUGIN_PATH%/}/$2
+            local path
+            if [[ -n $2 && -n ${USEPKG_PKG_DECL[$2]} ]]; then
+                path=${${(M)USEPKG_PKG_DESC:#"$2:"*}#"$2:"}
+                if [[ -d $path ]]; then
+                    cd $path
+                else
+                    path=${USEPKG_PLUGIN_PATH%/}/$2
+                    if [[ -d $path ]]; then
+                        cd $path
+                    else
+                        usepkg-error "Unable to locate $2."
+                        return 2 # ENOENT
+                    fi
+                fi
+            else
+                return 22 # EINVAL
             fi
             ;;
         update)
@@ -627,8 +641,14 @@ function usepkg() {
 }
 
 # set default value
-defpkg-satus :ensure true :fetcher git :from 'https://github.com'
+defpkg-satus :ensure true :fetcher git :from https://github.com
 # the recipe of this package itself
-defpkg :path gynamics/zsh-usepkg :comp _usepkg
+if [[ "$(dirname "$(realpath "$0")")" != ${USEPKG_PLUGIN_PATH}/zsh-usepkg ]]; then
+    # if not loaded from plugin path, treat it as a local repository
+    defpkg :fetcher nope :from "$(dirname "$(dirname "$(realpath "$0")")")" \
+           :path zsh-usepkg :comp _usepkg
+else
+    defpkg :path gynamics/zsh-usepkg :comp _usepkg
+fi
 # no need to load it twice
 USEPKG_PKG_STATUS[zsh-usepkg]=OK
