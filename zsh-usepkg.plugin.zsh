@@ -127,10 +127,10 @@ function defpkg() {
 
 # check given package
 # return 0 if package ready
-# return -2 if not found
+# return 2 if not found
 function defpkg-check() {
     if [[ -z ${USEPKG_PKG_DECL[$1]} ]]; then
-        return -22 # -EINVAL
+        return 22 # EINVAL
     fi
 
     usepkg-debug "Checking package ${1} ..."
@@ -171,13 +171,13 @@ function defpkg-check() {
             fi
         fi
     fi
-    return -2 # -ENOENT
+    return 2 # ENOENT
 }
 
 # fetch given package, this function may be called concurrently
 function defpkg-fetch() {
     if [[ -z ${USEPKG_PKG_DECL[$1]} ]]; then
-        return -22 # -EINVAL
+        return 22 # EINVAL
     fi
 
     usepkg-debug "Fetching package ${1} ..."
@@ -230,7 +230,7 @@ function defpkg-fetch() {
                 ;;
             *)
                 usepkg-error "Unknown fetcher ${pkg[:fetcher]}"
-                return -22 # -EINVAL
+                return 22 # EINVAL
                 ;;
         esac
 
@@ -250,12 +250,12 @@ function defpkg-load() {
         return 0
     elif [[ ${USEPKG_PKG_STATUS[$1]} != READY ]]; then
         usepkg-error "$1 is not ready to load, abort."
-        return -2 # -ENOENT
+        return 2 # ENOENT
     fi
 
     # parse declaration
     if [[ -z ${USEPKG_PKG_DECL[$1]} ]]; then
-        return -22 # -EINVAL
+        return 22 # EINVAL
     fi
 
     # extract one pkg
@@ -302,7 +302,7 @@ function defpkg-load() {
             defpkg-load $key
             if [[ $? != 0 ]]; then
                 usepkg-error "Dependency $key broken, abort."
-                return -1
+                return 2 # ENOENT
             fi
         fi
     done
@@ -338,7 +338,7 @@ function defpkg-load() {
             USEPKG_PKG_STATUS[$1]=LOAD_FAILURE
             if ${pkg[:ensure]}; then
                 usepkg-error "Failed to find ${ent} !"
-                return -2 # -ENOENT
+                return 2 # ENOENT
             else
                 usepkg-debug "Failed to find ${ent} !"
                 return 0
@@ -406,7 +406,7 @@ function defpkg-finis() {
 # Usage: usepkg-update [PACKGE-NAME]
 function usepkg-update() {
     if [[ -z ${USEPKG_PKG_DECL[$1]} ]]; then
-        return -22 # -EINVAL
+        return 22 # EINVAL
     fi
 
     # extract one pkg
@@ -452,7 +452,7 @@ function usepkg-update() {
             ;;
         *)
             usepkg-message "${pkg[:name]} is not of updatable type."
-            return -22 # -EINVAL
+            return 22 # EINVAL
             ;;
     esac
 }
@@ -460,7 +460,7 @@ function usepkg-update() {
 # Usage: usepkg-remove [PACKGE-NAME]
 function usepkg-remove() {
     if [[ -z ${USEPKG_PKG_DECL[$1]} ]]; then
-        return -22 # -EINVAL
+        return 22 # EINVAL
     fi
 
     # extract one pkg
@@ -484,7 +484,7 @@ function usepkg-remove() {
         usepkg-error "${pkg[:name]} is a local package\n" \
                      "local packages won't be removed, " \
                      "please remove it manually."
-        return -1 # -EPERM
+        return 1 # EPERM
     fi
 }
 
@@ -621,7 +621,7 @@ function usepkg() {
                 echo "Unknown command: $cmd"
             fi
             echo -e "Run \e[1musepkg help\e[0m for help."
-            return -22 # -EINVAL
+            return 22 # EINVAL
             ;;
     esac
 }
