@@ -18,7 +18,7 @@ Pros:
 
 ## Installation
 
-You can also simply download `zsh-usepkg.plugin.zsh`from github and source it. However, once it starts fetch plugins, all plugins fetched will be saved in directory path `$USEPKG_PLUGIN_PATH`(default value is `$HOME/.local/share/zsh/plugins`). You can overwrite this variable before running `defpkg-finis`.
+You can also simply download `zsh-usepkg.plugin.zsh` from github with link `https://raw.githubusercontent.com/gynamics/zsh-usepkg/master/zsh-usepkg.plugin.zsh` and then source it. However, once it starts fetch plugins, all plugins fetched will be saved in directory path `$USEPKG_PLUGIN_PATH`(default value is `$HOME/.local/share/zsh/plugins`). You can overwrite this variable before running `defpkg-finis`.
 
 ``` shell
 # Bootstrap, put it at the top of your configuration
@@ -115,7 +115,8 @@ defpkg :from /usr/share :path fzf \
 defpkg-satus :ensure true :fetcher git :from https://github.com
 defpkg :path gynamics/zsh-config
 defpkg :path gynamics/zsh-dirstack
-defpkg :path gynamics/zsh-gitneko :after zsh-config :comp _gitneko
+defpkg :path gynamics/zsh-gitneko :after zsh-config :comp _gitneko \
+       :config 'NEKOPS_PS_T=true'
 # load it after zsh-config, since only zsh-config calls compinit,
 # _gitneko will not be scanned at the first time.
 
