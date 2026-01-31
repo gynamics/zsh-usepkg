@@ -39,7 +39,7 @@ function usepkg-debug() {
     fi
 }
 
-defpkg_keys=( :name :ensure :fetcher :from :path :branch :source :depends :after :comp :preface :config :rev )
+defpkg_keys=( :name :ensure :fetcher :from :path :branch :source :depends :after :comp :preface :init :config :rev )
 
 typeset -gA USEPKG_PKG_PROTO
 
@@ -271,9 +271,28 @@ function defpkg-load() {
         fi
     done
 
+    # change directory
+    local od="$(pwd)"
+    local dir
+    local ret
+    case "${pkg[:fetcher]}" in
+        nope)
+            dir="${pkg[:from]%/}/${pkg[:path]%/}"
+            ;;
+        *)
+            dir="${USEPKG_PLUGIN_PATH%/}/${pkg[:name]%/}"
+            ;;
+    esac
+
     # load preface
     usepkg-debug "Eval preface \"${pkg[:preface]}\" ..."
-    eval ${pkg[:preface]}
+    cd "$dir" && eval "${pkg[:preface]}"
+    ret=$?
+    cd "${od}"
+    if [[ $ret != 0 ]]; then
+        USEPKG_PKG_STATUS[$1]=LOAD_FAILURE
+        return $ret
+    fi
 
     # pin it when preparing dependencies to avoid cycles
     USEPKG_PKG_STATUS[$1]=PREPARING
@@ -311,19 +330,21 @@ function defpkg-load() {
     # however, it is possible to polling on LOADING state in the future.
     USEPKG_PKG_STATUS[$1]=LOADING
 
+    # pre-load initialization
+    usepkg-debug "Eval init \"${pkg[:init]}\" ..."
+    cd "${dir}" && eval "${pkg[:init]}"
+    ret=$?
+    cd "${od}"
+    if [[ $ret != 0 ]]; then
+        USEPKG_PKG_STATUS[$1]=LOAD_FAILURE
+        return $ret
+    fi
+
     # load script file
     local f
     local ent
-    local ret
     for f in ${(s/ /)pkg[:source]}; do
-        case "${pkg[:fetcher]}" in
-            nope)
-                ent=${pkg[:from]%/}/${pkg[:path]%/}/${f}
-                ;;
-            *)
-                ent=${USEPKG_PLUGIN_PATH%/}/${pkg[:name]%/}/${f}
-                ;;
-        esac
+        ent="${dir}/${f}"
 
         if [[ -e "${ent}" ]]; then
             usepkg-debug "Loading file ${ent} ..."
@@ -347,20 +368,27 @@ function defpkg-load() {
     done
 
     # load completions
-    local base="${USEPKG_PLUGIN_PATH%/}/${pkg[:name]%/}"
-    for ent in ${(s/ /)pkg[:comp]}; do
-        usepkg-debug "Loading completion ${ent} ..."
-        f="${base}/${ent}"
-        f="${f:t}" # get basename
-        if [[ ! -f "${USEPKG_FUNC_PATH%/}/${f}" ||
-              "${base}/${ent}" -nt "${USEPKG_FUNC_PATH%/}/${f}" ]]; then
-            cp "${base}/${ent}" "${USEPKG_FUNC_PATH%/}/"
+    for f in ${(s/ /)pkg[:comp]}; do
+        usepkg-debug "Loading completion ${f} ..."
+        ent="${dir}/${f}"
+
+        ent="${ent:t}" # get basename
+        # if it is not found in USEPKG_FUNC_PATH, copy it here.
+        if [[ ! -f "${USEPKG_FUNC_PATH%/}/${ent}" ||
+              "${dir}/${f}" -nt "${USEPKG_FUNC_PATH%/}/${ent}" ]]; then
+            cp "${dir}/${f}" "${USEPKG_FUNC_PATH%/}/"
         fi
     done
 
     # load config
     usepkg-debug "Eval config \"${pkg[:config]}\" ..."
-    eval ${pkg[:config]}
+    cd "${dir}" && eval "${pkg[:config]}"
+    ret=$?
+    cd "${od}"
+    if [[ $ret != 0 ]]; then
+        USEPKG_PKG_STATUS[$1]=LOAD_FAILURE
+        return $ret
+    fi
 
     USEPKG_PKG_STATUS[$1]=OK
     return 0
