@@ -111,13 +111,17 @@ defpkg :path zsh-syntax-highlighting # you may installed it as a system package
 
 # the `fzf' system package provides some zsh integration scripts
 defpkg :from /usr/share :path fzf \
-    :source completion.zsh key-bindings.zsh
+       :source completion.zsh key-bindings.zsh
 
 # fetch from github
 defpkg-satus :ensure true :fetcher git :from https://github.com
-defpkg :path gynamics/zsh-config
-defpkg :path gynamics/zsh-dirstack
-defpkg :path gynamics/zsh-gitneko :after zsh-config :comp _gitneko \
+defpkg :path gynamics/zsh-config \
+       :config 'HISTSIZE=3000; SAVEHIST=10000'
+defpkg :path gynamics/zsh-dirstack \
+       :config 'popd'
+defpkg :path gynamics/zsh-gitneko \
+       :after zsh-config \
+       :comp _gitneko \
        :config 'NEKOPS_PS_T=true'
 # load it after zsh-config, since only zsh-config calls compinit,
 # _gitneko will not be scanned at the first time.
