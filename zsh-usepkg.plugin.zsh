@@ -133,12 +133,11 @@ function defpkg-check() {
         return 22 # EINVAL
     fi
 
-    usepkg-debug "Checking package ${1} ..."
-
     if [[ ${USEPKG_PKG_STATUS[$1]} == OK ]]; then
         return 0 # already loaded
     fi
 
+    usepkg-debug "Checking package ${1} ..."
     # extract one pkg
     typeset -A pkg
     local key

@@ -9,7 +9,7 @@ _USEPKG_SUBCMDS=(
     "reload:reload a list of packages."
     "remove:remove a list of packages, local packages won't be removed."
     "status:list package loading status."
-    "clean:remove undeclared packages in ${USEPKG_DATA}."
+    "clean:remove undeclared packages in ${USEPKG_PLUGIN_PATH}."
 )
 
 _usepkg() {
